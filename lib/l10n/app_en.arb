@@ -1,0 +1,12 @@
+{
+  "@@locale": "en",
+  "instruction": "Select gait mode",
+  "connectionStatus": "Connection Status",
+  "connected": "Connected",
+  "disconnected": "Disconnected",
+  "connecting": "Connecting...",
+  "topic": "Topic",
+  "levantar": "Rise Up",
+  "andar": "Walk",
+  "subir_escada": "Climb Stairs"
+}

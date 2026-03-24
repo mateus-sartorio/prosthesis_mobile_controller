@@ -1,0 +1,12 @@
+{
+  "@@locale": "pt",
+  "instruction": "Selecione o modo de marcha",
+  "connectionStatus": "Status da Conexão",
+  "connected": "Conectado",
+  "disconnected": "Desconectado",
+  "connecting": "Conectando...",
+  "topic": "Tópico",
+  "levantar": "Levantar",
+  "andar": "Andar",
+  "subir_escada": "Subir Escada"
+}
