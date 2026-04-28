@@ -47,7 +47,7 @@ class MqttService {
 
       final connMessage = MqttConnectMessage()
           .withClientIdentifier(_runtimeClientId)
-          .withWillTopic(MqttConfig.actionsTopic)
+          .withWillTopic(MqttConfig.commandLogsTopic)
           .withWillMessage('offline')
           .startClean()
           .withWillQos(MqttQos.atLeastOnce);
@@ -55,15 +55,17 @@ class MqttService {
       client.connectionMessage = connMessage;
       _client = client;
 
-      await client.connect(
-        MqttConfig.username.isEmpty ? null : MqttConfig.username,
-        MqttConfig.password.isEmpty ? null : MqttConfig.password,
-      ).timeout(
-        MqttConfig.connectionTimeout,
-        onTimeout: () {
-          throw Exception('Connection timeout');
-        },
-      );
+      await client
+          .connect(
+            MqttConfig.username ?? MqttConfig.username,
+            MqttConfig.password ?? MqttConfig.password,
+          )
+          .timeout(
+            MqttConfig.connectionTimeout,
+            onTimeout: () {
+              throw Exception('Connection timeout');
+            },
+          );
 
       final status = client.connectionStatus?.state;
       if (status != MqttConnectionState.connected) {
@@ -101,19 +103,19 @@ class MqttService {
     }
 
     try {
-      final command = ActionCommand(commandType: 1, value: value);
+      final command = CommandLog(commandType: CommandType.gaitMode.value, value: value);
       final payload = command.toJson();
 
       final builder = MqttClientPayloadBuilder()..addString(payload);
 
       _client!.publishMessage(
-        MqttConfig.actionsTopic,
+        MqttConfig.commandLogsTopic,
         MqttQos.atLeastOnce,
         builder.payload!,
         retain: false,
       );
 
-      debugPrint('Published: $payload to ${MqttConfig.actionsTopic}');
+      debugPrint('Published: $payload to ${MqttConfig.commandLogsTopic}');
     } catch (e) {
       debugPrint('MQTT Publish error: $e');
       rethrow;

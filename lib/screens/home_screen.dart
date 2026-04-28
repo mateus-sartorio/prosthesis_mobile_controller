@@ -69,7 +69,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _handleLevantar() async {
     try {
       await _mqttService.publishAction(1);
-      _showActionFeedback('Levantar');
+      _showActionFeedback('Stand Up');
     } catch (e) {
       _showErrorSnackBar('Failed to publish action: $e');
     }
@@ -79,7 +79,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _handleAndar() async {
     try {
       await _mqttService.publishAction(2);
-      _showActionFeedback('Andar');
+      _showActionFeedback('Walk');
     } catch (e) {
       _showErrorSnackBar('Failed to publish action: $e');
     }
@@ -89,7 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _handleSubirEscada() async {
     try {
       await _mqttService.publishAction(3);
-      _showActionFeedback('Subir Escada');
+      _showActionFeedback('Climb Stairs');
     } catch (e) {
       _showErrorSnackBar('Failed to publish action: $e');
     }
@@ -111,10 +111,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _showErrorSnackBar(String message) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text(message), backgroundColor: Colors.red),
       );
     }
   }
@@ -176,12 +173,9 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               Expanded(
                 child: Text(
-                  MqttConfig.actionsTopic,
+                  MqttConfig.commandLogsTopic,
                   textAlign: TextAlign.end,
-                  style: const TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 12,
-                  ),
+                  style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),

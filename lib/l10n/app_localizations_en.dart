@@ -27,7 +27,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get topic => 'Topic';
 
   @override
-  String get levantar => 'Rise Up';
+  String get levantar => 'Stand Up';
 
   @override
   String get andar => 'Walk';
