@@ -1,0 +1,12 @@
+{
+  "host": "mqtt.example.com",
+  "port": 1883,
+  "username": null,
+  "password": null,
+  "commandLogsTopic": "prothesis/actions",
+  "qos": 1,
+  "clientId": "prothesis-mobile-controller",
+  "connectionTimeoutSeconds": 15,
+  "reconnectIntervalSeconds": 5,
+  "maxReconnectAttempts": 10
+}

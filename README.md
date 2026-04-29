@@ -1,17 +1,18 @@
 # prothesis_mobile_controller
 
-A new Flutter project.
+## Environment configs
 
-## Getting Started
+The app loads MQTT settings from a JSON file in `assets/config/`.
 
-This project is a starting point for a Flutter application.
+- `assets/config/dev.json` is for local development and emulator runs.
+- `assets/config/prod.json` is for production builds.
 
-A few resources to get you started if this is your first Flutter project:
+Select the configuration with `APP_ENV`:
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+```bash
+flutter run --dart-define=APP_ENV=dev
+flutter run --dart-define=APP_ENV=prod
+flutter build apk --release --dart-define=APP_ENV=prod
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+If you do not pass `APP_ENV`, the app defaults to `dev`.

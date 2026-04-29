@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'config/mqtt_config.dart';
 import 'l10n/app_localizations.dart';
 import 'screens/home_screen.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await MqttConfig.load();
   runApp(const MyApp());
 }
 

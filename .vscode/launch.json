@@ -5,21 +5,56 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "prothesis_mobile_controller",
-            "request": "launch",
-            "type": "dart"
-        },
-        {
-            "name": "prothesis_mobile_controller (profile mode)",
+            "name": "prothesis_mobile_controller (dev)",
             "request": "launch",
             "type": "dart",
-            "flutterMode": "profile"
+            "toolArgs": [
+                "--dart-define=APP_ENV=dev"
+            ]
         },
         {
-            "name": "prothesis_mobile_controller (release mode)",
+            "name": "prothesis_mobile_controller (prod)",
             "request": "launch",
             "type": "dart",
-            "flutterMode": "release"
+            "toolArgs": [
+                "--dart-define=APP_ENV=prod"
+            ]
+        },
+        {
+            "name": "prothesis_mobile_controller (dev profile mode)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile",
+            "toolArgs": [
+                "--dart-define=APP_ENV=dev"
+            ]
+        },
+        {
+            "name": "prothesis_mobile_controller (prod profile mode)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile",
+            "toolArgs": [
+                "--dart-define=APP_ENV=prod"
+            ]
+        },
+        {
+            "name": "prothesis_mobile_controller (dev release mode)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release",
+            "toolArgs": [
+                "--dart-define=APP_ENV=dev"
+            ]
+        },
+        {
+            "name": "prothesis_mobile_controller (prod release mode)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release",
+            "toolArgs": [
+                "--dart-define=APP_ENV=prod"
+            ]
         }
     ]
 }
