@@ -41,6 +41,7 @@ class MqttService {
 
       final client = MqttServerClient(MqttConfig.host, _runtimeClientId);
       client.port = MqttConfig.port;
+      client.secure = MqttConfig.useSSL;
       client.keepAlivePeriod = 20;
       client.onConnected = _onConnected;
       client.onDisconnected = _onDisconnected;
@@ -56,10 +57,7 @@ class MqttService {
       _client = client;
 
       await client
-          .connect(
-            MqttConfig.username ?? MqttConfig.username,
-            MqttConfig.password ?? MqttConfig.password,
-          )
+          .connect(MqttConfig.username, MqttConfig.password)
           .timeout(
             MqttConfig.connectionTimeout,
             onTimeout: () {
@@ -103,7 +101,10 @@ class MqttService {
     }
 
     try {
-      final command = CommandLog(commandType: CommandType.gaitMode.value, value: value);
+      final command = CommandLog(
+        commandType: CommandType.gaitMode.value,
+        value: value,
+      );
       final payload = command.toJson();
 
       final builder = MqttClientPayloadBuilder()..addString(payload);

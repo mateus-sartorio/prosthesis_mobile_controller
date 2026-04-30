@@ -10,6 +10,7 @@ class MqttConfig {
   static String _environment = 'dev';
   static String _host = '10.0.2.2';
   static int _port = 1883;
+  static bool _useSSL = false;
   static String? _username;
   static String? _password;
   static String _commandLogsTopic = 'prothesis/actions';
@@ -22,6 +23,7 @@ class MqttConfig {
   static String get environment => _environment;
   static String get host => _host;
   static int get port => _port;
+  static bool get useSSL => _useSSL;
   static String? get username => _username;
   static String? get password => _password;
   static String get commandLogsTopic => _commandLogsTopic;
@@ -59,6 +61,7 @@ class MqttConfig {
     _environment = selectedEnvironment;
     _host = readString(decoded, 'host', fallback: _host);
     _port = readInt(decoded, 'port', fallback: _port);
+    _useSSL = readBool(decoded, 'useSSL', fallback: _useSSL);
     _username = readNullableString(decoded, 'username');
     _password = readNullableString(decoded, 'password');
     _commandLogsTopic = readString(

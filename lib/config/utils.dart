@@ -31,3 +31,23 @@ int readInt(Map<String, dynamic> data, String key, {required int fallback}) {
   }
   return fallback;
 }
+
+bool readBool(Map<String, dynamic> data, String key, {required bool fallback}) {
+  final value = data[key];
+  if (value is bool) {
+    return value;
+  }
+  if (value is String) {
+    final normalized = value.trim().toLowerCase();
+    if (normalized == 'true') {
+      return true;
+    }
+    if (normalized == 'false') {
+      return false;
+    }
+  }
+  if (value is num) {
+    return value != 0;
+  }
+  return fallback;
+}

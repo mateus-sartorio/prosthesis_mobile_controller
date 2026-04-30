@@ -1,8 +1,9 @@
 {
-  "host": "10.0.2.2",
-  "port": 1883,
-  "username": null,
-  "password": null,
+  "host": "1c3070463886424684be8c4f3c5941fe.s1.eu.hivemq.cloud",
+  "port": 8883,
+  "useSSL": true,
+  "username": "mateus",
+  "password": "MateusTest123",
   "commandLogsTopic": "prothesis/actions",
   "qos": 1,
   "clientId": "prothesis-mobile-controller-dev",
