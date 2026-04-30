@@ -1,6 +1,7 @@
 {
-  "host": "10.0.2.2",
-  "port": 1883,
+  "host": "1c3070463886424684be8c4f3c5941fe.s1.eu.hivemq.cloud",
+  "port": 8883,
+  "useSSL": true,
   "username": null,
   "password": null,
   "commandLogsTopic": "prothesis/actions",

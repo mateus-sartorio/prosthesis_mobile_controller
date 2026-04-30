@@ -1,6 +1,7 @@
 {
   "host": "mqtt.example.com",
   "port": 1883,
+  "useSSL": false,
   "username": null,
   "password": null,
   "commandLogsTopic": "prothesis/actions",
