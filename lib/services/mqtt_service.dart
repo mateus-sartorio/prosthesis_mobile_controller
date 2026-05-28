@@ -48,10 +48,7 @@ class MqttService {
 
       final connMessage = MqttConnectMessage()
           .withClientIdentifier(_runtimeClientId)
-          .withWillTopic(MqttConfig.commandLogsTopic)
-          .withWillMessage('offline')
-          .startClean()
-          .withWillQos(MqttQos.atLeastOnce);
+          .startClean();
 
       client.connectionMessage = connMessage;
       _client = client;
