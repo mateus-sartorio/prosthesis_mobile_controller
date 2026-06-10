@@ -14,17 +14,31 @@ extension CommandTypeValue on CommandType {
 
 /// Gait modes
 enum GaitMode {
-  standUp(1),
-  walk(2),
-  climbStairs(3);
+  walking(1),
+  stairAscent(2),
+  standing(3),
+  stairDescent(4),
+  upslopeWalking(5),
+  downslopeWalking(6),
+  sitting(7),
+  sitToStand(8),
+  standToSit(9);
 
   final int value;
   const GaitMode(this.value);
 
-  String buildGaitModeActionMessage() {
-    final modeName = name.replaceAll('_', ' ').toLowerCase();
-    final title = modeName.split(' ').map((s) => s[0].toUpperCase() + s.substring(1)).join(' ');
-    return 'Gait mode changed to $title';
+  String get label {
+    switch (this) {
+      case GaitMode.walking:        return 'Walking';
+      case GaitMode.stairAscent:    return 'Stair Ascent';
+      case GaitMode.standing:       return 'Standing';
+      case GaitMode.stairDescent:   return 'Stair Descent';
+      case GaitMode.upslopeWalking: return 'Upslope Walking';
+      case GaitMode.downslopeWalking: return 'Downslope Walking';
+      case GaitMode.sitting:        return 'Sitting';
+      case GaitMode.sitToStand:     return 'Sit to Stand';
+      case GaitMode.standToSit:     return 'Stand to Sit';
+    }
   }
 }
 
