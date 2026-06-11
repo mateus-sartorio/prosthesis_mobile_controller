@@ -39,6 +39,7 @@ dependencies:
   mqtt_client: ^9.7.0
   intl: ^0.20.2
   http: ^1.2.2
+  fl_chart: ^1.2.0
 
 dev_dependencies:
   flutter_test:
