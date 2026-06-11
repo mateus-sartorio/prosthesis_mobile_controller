@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'config/mqtt_config.dart';
 import 'l10n/app_localizations.dart';
-import 'screens/home_screen.dart';
+import 'screens/main_navigation.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,7 +25,7 @@ class MyApp extends StatelessWidget {
       // Localization configuration
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
-      home: const HomeScreen(),
+      home: const MainNavigation(),
     );
   }
 }
