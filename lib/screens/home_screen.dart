@@ -15,18 +15,40 @@ class _HomeScreenState extends State<HomeScreen> {
   late MqttService _mqttService;
   bool _isConnected = false;
   bool _isConnecting = false;
+  bool _isRunning = false;
   GaitMode? _activeMode;
 
   static const _modeConfig = <GaitMode, ({IconData icon, Color color})>{
-    GaitMode.walking:          (icon: Icons.directions_walk_rounded,  color: Color(0xFF2563EB)),
-    GaitMode.stairAscent:      (icon: Icons.north_rounded,            color: Color(0xFF7C3AED)),
-    GaitMode.standing:         (icon: Icons.accessibility_new_rounded, color: Color(0xFF059669)),
-    GaitMode.stairDescent:     (icon: Icons.south_rounded,            color: Color(0xFFDB2777)),
-    GaitMode.upslopeWalking:   (icon: Icons.trending_up_rounded,      color: Color(0xFFD97706)),
-    GaitMode.downslopeWalking: (icon: Icons.trending_down_rounded,    color: Color(0xFF0891B2)),
-    GaitMode.sitting:          (icon: Icons.airline_seat_recline_normal_rounded, color: Color(0xFF65A30D)),
-    GaitMode.sitToStand:       (icon: Icons.upload_rounded,           color: Color(0xFFEA580C)),
-    GaitMode.standToSit:       (icon: Icons.download_rounded,         color: Color(0xFF6D28D9)),
+    GaitMode.walking: (
+      icon: Icons.directions_walk_rounded,
+      color: Color(0xFF2563EB),
+    ),
+    GaitMode.stairAscent: (icon: Icons.north_rounded, color: Color(0xFF7C3AED)),
+    GaitMode.standing: (
+      icon: Icons.accessibility_new_rounded,
+      color: Color(0xFF059669),
+    ),
+    GaitMode.stairDescent: (
+      icon: Icons.south_rounded,
+      color: Color(0xFFDB2777),
+    ),
+    GaitMode.upslopeWalking: (
+      icon: Icons.trending_up_rounded,
+      color: Color(0xFFD97706),
+    ),
+    GaitMode.downslopeWalking: (
+      icon: Icons.trending_down_rounded,
+      color: Color(0xFF0891B2),
+    ),
+    GaitMode.sitting: (
+      icon: Icons.airline_seat_recline_normal_rounded,
+      color: Color(0xFF65A30D),
+    ),
+    GaitMode.sitToStand: (icon: Icons.upload_rounded, color: Color(0xFFEA580C)),
+    GaitMode.standToSit: (
+      icon: Icons.download_rounded,
+      color: Color(0xFF6D28D9),
+    ),
   };
 
   @override
@@ -61,9 +83,27 @@ class _HomeScreenState extends State<HomeScreen> {
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to connect: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Failed to connect: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
+    }
+  }
+
+  void _toggleRunning() {
+    setState(() => _isRunning = !_isRunning);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_isRunning ? 'Started' : 'Stopped'),
+          duration: const Duration(seconds: 1),
+          backgroundColor: _isRunning
+              ? const Color(0xFF22C55E)
+              : const Color(0xFFEF4444),
+        ),
+      );
     }
   }
 
@@ -83,14 +123,19 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to send command: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Failed to send command: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
   }
 
   Widget _buildStatusBar(AppLocalizations l10n) {
-    final statusColor = _isConnected ? const Color(0xFF22C55E) : const Color(0xFFEF4444);
+    final statusColor = _isConnected
+        ? const Color(0xFF22C55E)
+        : const Color(0xFFEF4444);
     final statusText = _isConnecting
         ? l10n.connecting
         : (_isConnected ? l10n.connected : l10n.disconnected);
@@ -104,14 +149,28 @@ class _HomeScreenState extends State<HomeScreen> {
             duration: const Duration(milliseconds: 300),
             width: 8,
             height: 8,
-            decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle),
+            decoration: BoxDecoration(
+              color: statusColor,
+              shape: BoxShape.circle,
+            ),
           ),
           const SizedBox(width: 8),
-          Text(statusText, style: TextStyle(color: statusColor, fontSize: 13, fontWeight: FontWeight.w600)),
+          Text(
+            statusText,
+            style: TextStyle(
+              color: statusColor,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           const Spacer(),
           Text(
             MqttConfig.commandLogsTopic,
-            style: const TextStyle(fontFamily: 'monospace', fontSize: 11, color: Color(0xFF94A3B8)),
+            style: const TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 11,
+              color: Color(0xFF94A3B8),
+            ),
             overflow: TextOverflow.ellipsis,
           ),
         ],
@@ -132,11 +191,21 @@ class _HomeScreenState extends State<HomeScreen> {
           color: isActive ? cfg.color : const Color(0xFF1E293B),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isActive ? cfg.color : enabled ? const Color(0xFF334155) : const Color(0xFF1E293B),
+            color: isActive
+                ? cfg.color
+                : enabled
+                ? const Color(0xFF334155)
+                : const Color(0xFF1E293B),
             width: 1.5,
           ),
           boxShadow: isActive
-              ? [BoxShadow(color: cfg.color.withValues(alpha: 0.4), blurRadius: 12, spreadRadius: 1)]
+              ? [
+                  BoxShadow(
+                    color: cfg.color.withValues(alpha: 0.4),
+                    blurRadius: 12,
+                    spreadRadius: 1,
+                  ),
+                ]
               : null,
         ),
         child: Opacity(
@@ -146,7 +215,11 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(cfg.icon, size: 28, color: isActive ? Colors.white : cfg.color),
+                Icon(
+                  cfg.icon,
+                  size: 28,
+                  color: isActive ? Colors.white : cfg.color,
+                ),
                 const SizedBox(height: 8),
                 Text(
                   mode.label,
@@ -181,7 +254,10 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(
-        title: const Text('Prothesis Controller', style: TextStyle(fontWeight: FontWeight.w600)),
+        title: const Text(
+          'Prothesis Controller',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
         backgroundColor: const Color(0xFF0F172A),
         foregroundColor: Colors.white,
         elevation: 0,
@@ -200,6 +276,34 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 16, top: 4),
+                      child: ElevatedButton.icon(
+                        onPressed: _toggleRunning,
+                        icon: Icon(
+                          _isRunning
+                              ? Icons.stop_rounded
+                              : Icons.play_arrow_rounded,
+                        ),
+                        label: Text(
+                          _isRunning ? 'Stop' : 'Start',
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _isRunning
+                              ? const Color(0xFFEF4444)
+                              : const Color(0xFF22C55E),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 36,
+                            vertical: 20,
+                          ),
+                          shape: const StadiumBorder(),
+                        ),
+                      ),
+                    ),
+                  ),
                   Padding(
                     padding: const EdgeInsets.only(bottom: 16, top: 4),
                     child: Text(
@@ -235,12 +339,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: ElevatedButton.icon(
                   onPressed: _connectMqtt,
                   icon: const Icon(Icons.refresh_rounded),
-                  label: const Text('Reconnect', style: TextStyle(fontWeight: FontWeight.w600)),
+                  label: const Text(
+                    'Reconnect',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF334155),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
               ),
