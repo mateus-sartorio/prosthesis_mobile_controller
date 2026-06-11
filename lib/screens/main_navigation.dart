@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'home_screen.dart';
 import 'releases_screen.dart';
+import 'sensors_screen.dart';
 
 /// Root navigation shell hosting the app's primary tabs in a bottom
 /// navigation bar. Tabs are kept alive via [IndexedStack] so their state
@@ -16,13 +17,20 @@ class MainNavigation extends StatefulWidget {
 class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
 
-  static const List<Widget> _screens = [HomeScreen(), ReleasesScreen()];
-
   @override
   Widget build(BuildContext context) {
+    // Rebuilt each frame so [SensorsScreen] gets an up-to-date `isActive` flag
+    // (it gates its 10 Hz sampling on visibility). HomeScreen/ReleasesScreen
+    // are const, so they're canonicalized and keep their state across rebuilds.
+    final screens = [
+      const HomeScreen(),
+      SensorsScreen(isActive: _currentIndex == 1),
+      const ReleasesScreen(),
+    ];
+
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
-      body: IndexedStack(index: _currentIndex, children: _screens),
+      body: IndexedStack(index: _currentIndex, children: screens),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           border: Border(top: BorderSide(color: Color(0xFF1E293B), width: 1)),
@@ -39,6 +47,10 @@ class _MainNavigationState extends State<MainNavigation> {
             BottomNavigationBarItem(
               icon: Icon(Icons.directions_walk_rounded),
               label: 'Control',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.show_chart_rounded),
+              label: 'Sensors',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.system_update_rounded),
