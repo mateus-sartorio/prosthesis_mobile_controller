@@ -14,6 +14,7 @@ class MqttConfig {
   static String? _username;
   static String? _password;
   static String _commandLogsTopic = 'prothesis/actions';
+  static String _parsedLogsTopic = 'prothesis/logs/parsed';
   static int _qos = 1;
   static String _clientId = 'prothesis-mobile-controller';
   static Duration _connectionTimeout = const Duration(seconds: 15);
@@ -27,6 +28,7 @@ class MqttConfig {
   static String? get username => _username;
   static String? get password => _password;
   static String get commandLogsTopic => _commandLogsTopic;
+  static String get parsedLogsTopic => _parsedLogsTopic;
   static int get qos => _qos;
   static String get clientId => _clientId;
   static Duration get connectionTimeout => _connectionTimeout;
@@ -68,6 +70,11 @@ class MqttConfig {
       decoded,
       'commandLogsTopic',
       fallback: _commandLogsTopic,
+    );
+    _parsedLogsTopic = readString(
+      decoded,
+      'parsedLogsTopic',
+      fallback: _parsedLogsTopic,
     );
     _qos = readInt(decoded, 'qos', fallback: _qos);
     _clientId = readString(decoded, 'clientId', fallback: _clientId);

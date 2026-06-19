@@ -5,6 +5,7 @@
   "username": "mateus",
   "password": "MateusTest123",
   "commandLogsTopic": "prothesis/actions",
+  "parsedLogsTopic": "prothesis/logs/parsed",
   "qos": 1,
   "clientId": "prothesis-mobile-controller-dev",
   "connectionTimeoutSeconds": 15,
