@@ -1,13 +1,33 @@
 import 'dart:convert';
 
 /// Command type definitions
-enum CommandType { gaitMode }
+enum CommandType { gaitMode, power }
 
 extension CommandTypeValue on CommandType {
   int get value {
     switch (this) {
       case CommandType.gaitMode:
         return 1;
+      case CommandType.power:
+        return 2;
+    }
+  }
+}
+
+/// Power states (turn the prothesis on or off)
+enum PowerState {
+  on(16),
+  off(17);
+
+  final int value;
+  const PowerState(this.value);
+
+  String get label {
+    switch (this) {
+      case PowerState.on:
+        return 'On';
+      case PowerState.off:
+        return 'Off';
     }
   }
 }
@@ -69,6 +89,14 @@ class CommandLog {
       id: id,
       commandType: CommandType.gaitMode.value,
       value: mode.value,
+    );
+  }
+
+  factory CommandLog.fromPower(PowerState state, {String? id}) {
+    return CommandLog(
+      id: id,
+      commandType: CommandType.power.value,
+      value: state.value,
     );
   }
 

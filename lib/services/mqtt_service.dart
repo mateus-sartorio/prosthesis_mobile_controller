@@ -106,14 +106,17 @@ class MqttService {
   }
 
   /// Publish an action command to the actions topic
-  Future<void> publishAction(int value) async {
+  Future<void> publishAction(
+    int value, {
+    CommandType type = CommandType.gaitMode,
+  }) async {
     if (!_isConnected || _client == null) {
       throw Exception('MQTT not connected');
     }
 
     try {
       final command = CommandLog(
-        commandType: CommandType.gaitMode.value,
+        commandType: type.value,
         value: value,
       );
       final payload = command.toJson();
