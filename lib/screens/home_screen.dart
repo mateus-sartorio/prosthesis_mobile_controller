@@ -92,18 +92,35 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _toggleRunning() {
-    setState(() => _isRunning = !_isRunning);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_isRunning ? 'Started' : 'Stopped'),
-          duration: const Duration(seconds: 1),
-          backgroundColor: _isRunning
-              ? const Color(0xFF22C55E)
-              : const Color(0xFFEF4444),
-        ),
+  Future<void> _toggleRunning() async {
+    final newRunning = !_isRunning;
+    final powerState = newRunning ? PowerState.on : PowerState.off;
+    try {
+      await _mqttService.publishAction(
+        powerState.value,
+        type: CommandType.power,
       );
+      setState(() => _isRunning = newRunning);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(newRunning ? 'Started' : 'Stopped'),
+            duration: const Duration(seconds: 1),
+            backgroundColor: newRunning
+                ? const Color(0xFF22C55E)
+                : const Color(0xFFEF4444),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to send command: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 

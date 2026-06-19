@@ -75,6 +75,16 @@ class _SensorsScreenState extends State<SensorsScreen>
   /// Global sample counter, used as the x coordinate for every series.
   int _sampleIndex = 0;
 
+  /// Wall-clock arrival time (epoch seconds) of each retained sample, kept in
+  /// lockstep with the sliding window so an x coordinate can be mapped back to
+  /// a time for the axis labels. `_sampleTimes[0]` is the sample at global
+  /// index [_windowStart]. Samples in the same payload share one timestamp,
+  /// which is plenty for the coarse "seconds ago" ticks we draw.
+  final List<double> _sampleTimes = [];
+
+  /// Global sample index of `_sampleTimes[0]` (advances as the window trims).
+  int _windowStart = 0;
+
   /// Set when new samples have been buffered since the last UI flush.
   bool _dirty = false;
 
@@ -172,6 +182,7 @@ class _SensorsScreenState extends State<SensorsScreen>
       }
     }
 
+    final now = DateTime.now().millisecondsSinceEpoch / 1000.0;
     for (final sample in samples) {
       final x = _sampleIndex.toDouble();
       for (final key in _sensorKeys) {
@@ -180,6 +191,7 @@ class _SensorsScreenState extends State<SensorsScreen>
         _current[key] = value;
         _series[key]!.add(FlSpot(x, value));
       }
+      _sampleTimes.add(now);
       _sampleIndex++;
     }
 
@@ -189,6 +201,11 @@ class _SensorsScreenState extends State<SensorsScreen>
       if (buffer.length > _windowSize) {
         buffer.removeRange(0, buffer.length - _windowSize);
       }
+    }
+    if (_sampleTimes.length > _windowSize) {
+      final excess = _sampleTimes.length - _windowSize;
+      _sampleTimes.removeRange(0, excess);
+      _windowStart += excess;
     }
 
     _dirty = true;
@@ -405,8 +422,28 @@ class _SensorsScreenState extends State<SensorsScreen>
           rightTitles: const AxisTitles(
             sideTitles: SideTitles(showTitles: false),
           ),
-          bottomTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 20,
+              // A handful of ticks across the window — enough to give a sense
+              // of elapsed time without crowding the axis.
+              interval: (spots.last.x - spots.first.x) / 4,
+              getTitlesWidget: (value, meta) {
+                final label = _formatTimeLabel(value);
+                if (label == null) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    label,
+                    style: const TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 10,
+                    ),
+                  ),
+                );
+              },
+            ),
           ),
           leftTitles: AxisTitles(
             sideTitles: SideTitles(
@@ -462,6 +499,19 @@ class _SensorsScreenState extends State<SensorsScreen>
     }
     final pad = (maxY - minY) * 0.1;
     return (minY - pad, maxY + pad);
+  }
+
+  /// Relative-time label for a bottom-axis tick: the arrival time of the
+  /// sample at [x] expressed as how long ago it was, e.g. `-12s` or `now`.
+  /// Returns null when the tick falls outside the timestamped window so no
+  /// label is drawn.
+  String? _formatTimeLabel(double x) {
+    if (_sampleTimes.isEmpty) return null;
+    final i = x.round() - _windowStart;
+    if (i < 0 || i >= _sampleTimes.length) return null;
+    final secondsAgo = _sampleTimes.last - _sampleTimes[i];
+    if (secondsAgo < 0.5) return 'now';
+    return '-${secondsAgo.round()}s';
   }
 
   /// Axis labels: drop the decimals once values get large enough that they'd
