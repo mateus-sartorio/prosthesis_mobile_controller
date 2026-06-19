@@ -5,6 +5,7 @@
   "username": null,
   "password": null,
   "commandLogsTopic": "prothesis/actions",
+  "parsedLogsTopic": "prothesis/logs/parsed",
   "qos": 1,
   "clientId": "prothesis-mobile-controller",
   "connectionTimeoutSeconds": 15,

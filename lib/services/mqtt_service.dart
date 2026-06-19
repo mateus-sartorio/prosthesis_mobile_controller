@@ -7,8 +7,18 @@ import '../models/action_command.dart';
 
 /// Service for managing MQTT connection and publishing messages
 class MqttService {
+  MqttService({bool subscribeToParsedLogs = false})
+    : _subscribeToParsedLogs = subscribeToParsedLogs;
+
+  /// Whether this client should subscribe to the parsed-logs topic and emit
+  /// the payloads on [parsedLogsStream]. Off by default so a publish-only
+  /// client (e.g. the control screen) doesn't open a needless subscription.
+  final bool _subscribeToParsedLogs;
+
   MqttServerClient? _client;
   final _connectionStatusController = StreamController<bool>.broadcast();
+  final _parsedLogsController = StreamController<String>.broadcast();
+  StreamSubscription<List<MqttReceivedMessage<MqttMessage>>>? _updatesSub;
   final String _runtimeClientId =
       '${MqttConfig.clientId}-${DateTime.now().millisecondsSinceEpoch}';
 
@@ -20,6 +30,10 @@ class MqttService {
 
   /// Stream of connection status changes
   Stream<bool> get connectionStatusStream => _connectionStatusController.stream;
+
+  /// Stream of raw payloads received on the parsed-logs topic. Only emits when
+  /// the client was created with `subscribeToParsedLogs: true`.
+  Stream<String> get parsedLogsStream => _parsedLogsController.stream;
 
   /// Check if currently connected
   bool get isConnected => _isConnected;
@@ -126,6 +140,44 @@ class MqttService {
     _isConnected = true;
     _isReconnecting = false;
     _connectionStatusController.add(true);
+
+    if (_subscribeToParsedLogs) {
+      _subscribeParsedLogs();
+    }
+  }
+
+  /// Subscribes to the parsed-logs topic and wires the broker's update stream
+  /// into [parsedLogsStream]. Called on every (re)connect because each connect
+  /// builds a fresh client with its own `updates` stream.
+  void _subscribeParsedLogs() {
+    final client = _client;
+    if (client == null) {
+      return;
+    }
+
+    client.subscribe(MqttConfig.parsedLogsTopic, MqttQos.atLeastOnce);
+
+    // Drop any listener bound to a previous (now-dead) client before binding
+    // to the current one, so we never leak or double-handle messages.
+    _updatesSub?.cancel();
+    _updatesSub = client.updates?.listen(_onMessages);
+  }
+
+  /// Handles a batch of incoming MQTT messages, forwarding parsed-logs payloads
+  /// to [parsedLogsStream].
+  void _onMessages(List<MqttReceivedMessage<MqttMessage>> messages) {
+    for (final received in messages) {
+      if (received.topic != MqttConfig.parsedLogsTopic) {
+        continue;
+      }
+      final publishMessage = received.payload as MqttPublishMessage;
+      final payload = MqttPublishPayload.bytesToStringAsString(
+        publishMessage.payload.message,
+      );
+      if (!_parsedLogsController.isClosed) {
+        _parsedLogsController.add(payload);
+      }
+    }
   }
 
   /// Called when MQTT disconnects
@@ -178,11 +230,13 @@ class MqttService {
     _isDisposed = true;
     _manualDisconnect = true;
     _isReconnecting = false;
+    _updatesSub?.cancel();
     _client?.onDisconnected = null;
     _client?.onConnected = null;
     _client?.disconnect();
 
     _connectionStatusController.close();
+    _parsedLogsController.close();
     _isConnected = false;
   }
 }

@@ -29,22 +29,28 @@ enum GaitMode {
 
   String get label {
     switch (this) {
-      case GaitMode.walking:        return 'Walking';
-      case GaitMode.stairAscent:    return 'Stair Ascent';
-      case GaitMode.standing:       return 'Standing';
-      case GaitMode.stairDescent:   return 'Stair Descent';
-      case GaitMode.upslopeWalking: return 'Upslope Walking';
-      case GaitMode.downslopeWalking: return 'Downslope Walking';
-      case GaitMode.sitting:        return 'Sitting';
-      case GaitMode.sitToStand:     return 'Sit to Stand';
-      case GaitMode.standToSit:     return 'Stand to Sit';
+      case GaitMode.walking:
+        return 'Walking';
+      case GaitMode.stairAscent:
+        return 'Stair Ascent';
+      case GaitMode.standing:
+        return 'Standing';
+      case GaitMode.stairDescent:
+        return 'Stair Descent';
+      case GaitMode.upslopeWalking:
+        return 'Upslope Walking';
+      case GaitMode.downslopeWalking:
+        return 'Downslope Walking';
+      case GaitMode.sitting:
+        return 'Sitting';
+      case GaitMode.sitToStand:
+        return 'Sit to Stand';
+      case GaitMode.standToSit:
+        return 'Stand to Sit';
     }
   }
 }
 
-/// Model representing a command log ready to be sent to MQTT.
-/// The payload sent to MQTT will match the consumer's expected keys:
-/// `{ "timestamp": <ISO8601>, "command_type": <int>, "value": <int> }`
 class CommandLog {
   final String? id;
   final DateTime timestamp;
@@ -58,21 +64,23 @@ class CommandLog {
     required this.value,
   }) : timestamp = (timestamp ?? DateTime.now()).toUtc();
 
-  /// Helper factory for gait-mode commands
   factory CommandLog.fromGaitMode(GaitMode mode, {String? id}) {
-    return CommandLog(id: id, commandType: CommandType.gaitMode.value, value: mode.value);
+    return CommandLog(
+      id: id,
+      commandType: CommandType.gaitMode.value,
+      value: mode.value,
+    );
   }
 
-  /// Map representation matching the receiver/parser expectations
   Map<String, dynamic> toMap() => {
-        'timestamp': timestamp.toIso8601String(),
-        'command_type': commandType,
-        'value': value,
-      };
+    'timestamp': timestamp.toIso8601String(),
+    'command_type': commandType,
+    'value': value,
+  };
 
-  /// JSON string ready to publish to MQTT
   String toJson() => jsonEncode(toMap());
 
   @override
-  String toString() => 'CommandLog(id: $id, timestamp: $timestamp, commandType: $commandType, value: $value)';
+  String toString() =>
+      'CommandLog(id: $id, timestamp: $timestamp, commandType: $commandType, value: $value)';
 }
