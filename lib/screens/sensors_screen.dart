@@ -5,6 +5,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
 import '../config/mqtt_config.dart';
+import '../models/sensor_metadata.dart';
 import '../services/mqtt_service.dart';
 
 /// Live plot of the prothesis' sensors, fed from the parsed-logs MQTT topic
@@ -324,6 +325,7 @@ class _SensorsScreenState extends State<SensorsScreen>
     final key = _sensorKeys[index];
     final color = _colorFor(index);
     final value = _current[key];
+    final meta = SensorMetadata.forKey(key);
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
@@ -343,15 +345,18 @@ class _SensorsScreenState extends State<SensorsScreen>
                 decoration: BoxDecoration(color: color, shape: BoxShape.circle),
               ),
               const SizedBox(width: 10),
-              Text(
-                key,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
+              Expanded(
+                child: Text(
+                  meta.label,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               Text(
                 value == null ? '--' : value.toStringAsFixed(2),
                 style: TextStyle(
@@ -361,6 +366,17 @@ class _SensorsScreenState extends State<SensorsScreen>
                   fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
+              if (meta.unit != null) ...[
+                const SizedBox(width: 4),
+                Text(
+                  meta.unit!,
+                  style: TextStyle(
+                    color: color.withValues(alpha: 0.7),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 12),
@@ -396,6 +412,10 @@ class _SensorsScreenState extends State<SensorsScreen>
     final (minY, maxY) = _yRange(spots);
     final span = maxY - minY;
 
+    // A handful of ticks across the window — enough to give a sense of elapsed
+    // time without crowding the axis.
+    final tickInterval = (spots.last.x - spots.first.x) / 4;
+
     return LineChart(
       // Disable the implicit data-change animation: with new data every ~100 ms
       // it would never settle and would look like jitter.
@@ -426,12 +446,16 @@ class _SensorsScreenState extends State<SensorsScreen>
             sideTitles: SideTitles(
               showTitles: true,
               reservedSize: 20,
-              // A handful of ticks across the window — enough to give a sense
-              // of elapsed time without crowding the axis.
-              interval: (spots.last.x - spots.first.x) / 4,
+              interval: tickInterval,
               getTitlesWidget: (value, meta) {
                 final label = _formatTimeLabel(value);
                 if (label == null) return const SizedBox.shrink();
+                // Bursty data can map several evenly-spaced ticks onto nearly
+                // the same time; skip a tick whose label repeats the one to its
+                // left so labels don't render on top of each other.
+                if (_formatTimeLabel(value - tickInterval) == label) {
+                  return const SizedBox.shrink();
+                }
                 return Padding(
                   padding: const EdgeInsets.only(top: 6),
                   child: Text(
@@ -502,16 +526,42 @@ class _SensorsScreenState extends State<SensorsScreen>
   }
 
   /// Relative-time label for a bottom-axis tick: the arrival time of the
-  /// sample at [x] expressed as how long ago it was, e.g. `-12s` or `now`.
-  /// Returns null when the tick falls outside the timestamped window so no
-  /// label is drawn.
+  /// sample at [x] expressed as how long ago it was, e.g. `-30s`, `-5m`,
+  /// `-1h20m`, or `now`. Returns null when the tick falls outside the
+  /// timestamped window so no label is drawn.
   String? _formatTimeLabel(double x) {
     if (_sampleTimes.isEmpty) return null;
     final i = x.round() - _windowStart;
     if (i < 0 || i >= _sampleTimes.length) return null;
     final secondsAgo = _sampleTimes.last - _sampleTimes[i];
     if (secondsAgo < 0.5) return 'now';
-    return '-${secondsAgo.round()}s';
+    final windowSpan = _sampleTimes.last - _sampleTimes.first;
+    final age = _formatAge(secondsAgo, windowSpan);
+    return age == null ? null : '-$age';
+  }
+
+  /// Formats an age (seconds ago) into a compact, human-readable string. The
+  /// unit is chosen from the overall window span so every tick on the axis
+  /// reads in the same unit: seconds for sub-minute windows, whole minutes up
+  /// to an hour, then hours (with minutes) beyond that.
+  ///
+  /// Returns null when the age rounds to zero in the chosen unit, so a tick
+  /// that's essentially "now" isn't labelled `-0m` right on top of the `now`
+  /// tick at the right edge.
+  String? _formatAge(double secondsAgo, double windowSpan) {
+    if (windowSpan < 60) {
+      final seconds = secondsAgo.round();
+      return seconds == 0 ? null : '${seconds}s';
+    }
+    if (windowSpan < 3600) {
+      final minutes = (secondsAgo / 60).round();
+      return minutes == 0 ? null : '${minutes}m';
+    }
+    final totalMinutes = (secondsAgo / 60).round();
+    if (totalMinutes == 0) return null;
+    final hours = totalMinutes ~/ 60;
+    final minutes = totalMinutes % 60;
+    return minutes == 0 ? '${hours}h' : '${hours}h${minutes}m';
   }
 
   /// Axis labels: drop the decimals once values get large enough that they'd
