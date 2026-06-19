@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(flutter analyze lib/screens/sensors_screen.dart)",
+      "PowerShell(flutter analyze lib/screens/sensors_screen.dart lib/models/sensor_metadata.dart)"
+    ]
+  }
+}
