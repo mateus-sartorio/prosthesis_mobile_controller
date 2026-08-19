@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import '../models/github_release.dart';
 import '../services/github_release_service.dart';
 
-/// Lists the prothesis logger binary versions (GitHub releases) in a vertical,
+/// Lists the prosthesis logger binary versions (GitHub releases) in a vertical,
 /// lazily-paginated list. The release currently in use is highlighted; tapping
 /// another release changes the selection (visual only for now) and shows a
 /// confirmation toast.

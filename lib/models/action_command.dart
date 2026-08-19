@@ -14,7 +14,7 @@ extension CommandTypeValue on CommandType {
   }
 }
 
-/// Power states (turn the prothesis on or off)
+/// Power states (turn the prosthesis on or off)
 enum PowerState {
   on(16),
   off(17);

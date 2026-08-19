@@ -8,7 +8,7 @@ import '../config/mqtt_config.dart';
 import '../models/sensor_metadata.dart';
 import '../services/mqtt_service.dart';
 
-/// Live plot of the prothesis' sensors, fed from the parsed-logs MQTT topic
+/// Live plot of the prosthesis' sensors, fed from the parsed-logs MQTT topic
 /// ([MqttConfig.parsedLogsTopic]). Each JSON key in the incoming payload becomes
 /// one sensor channel; every payload carries a batch of samples that are
 /// appended to a per-sensor sliding window so memory stays bounded.
