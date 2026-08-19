@@ -7,14 +7,14 @@ import 'package:http/http.dart' as http;
 
 import '../models/github_release.dart';
 
-/// Fetches releases (binary versions) for the prothesis logger from GitHub.
+/// Fetches releases (binary versions) for the prosthesis logger from GitHub.
 ///
 /// Configuration is hardcoded for now, mirroring the standalone Python updater
 /// script. Releases are returned by the GitHub API newest-first and are fetched
 /// one page at a time so the UI can lazily load more as the user scrolls.
 class GithubReleaseService {
   // TODO: move these out of source before shipping (env / secure storage).
-  static const String _repo = 'mateus-sartorio/prothesis-logger';
+  static const String _repo = 'mateus-sartorio/prosthesis-logger';
   static const String _apiBase = 'https://api.github.com';
   static const String _token =
       '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';
@@ -28,7 +28,7 @@ class GithubReleaseService {
     : _client = client ?? http.Client();
 
   Map<String, String> get _headers => {
-    'User-Agent': 'prothesis-mobile-controller',
+    'User-Agent': 'prosthesis-mobile-controller',
     'Accept': 'application/vnd.github+json',
     'X-GitHub-Api-Version': '2022-11-28',
     if (_token.isNotEmpty) 'Authorization': 'Bearer $_token',

@@ -4,20 +4,29 @@ import 'package:mqtt_client/mqtt_client.dart';
 import 'package:mqtt_client/mqtt_server_client.dart';
 import '../config/mqtt_config.dart';
 import '../models/action_command.dart';
+import '../models/power_feedback.dart';
 
 /// Service for managing MQTT connection and publishing messages
 class MqttService {
-  MqttService({bool subscribeToParsedLogs = false})
-    : _subscribeToParsedLogs = subscribeToParsedLogs;
+  MqttService({
+    bool subscribeToParsedLogs = false,
+    bool subscribeToPowerFeedback = false,
+  }) : _subscribeToParsedLogs = subscribeToParsedLogs,
+       _subscribeToPowerFeedback = subscribeToPowerFeedback;
 
   /// Whether this client should subscribe to the parsed-logs topic and emit
   /// the payloads on [parsedLogsStream]. Off by default so a publish-only
   /// client (e.g. the control screen) doesn't open a needless subscription.
   final bool _subscribeToParsedLogs;
 
+  /// Whether this client should subscribe to the power-feedback topic and emit
+  /// the parsed messages on [powerFeedbackStream].
+  final bool _subscribeToPowerFeedback;
+
   MqttServerClient? _client;
   final _connectionStatusController = StreamController<bool>.broadcast();
   final _parsedLogsController = StreamController<String>.broadcast();
+  final _powerFeedbackController = StreamController<PowerFeedback>.broadcast();
   StreamSubscription<List<MqttReceivedMessage<MqttMessage>>>? _updatesSub;
   final String _runtimeClientId =
       '${MqttConfig.clientId}-${DateTime.now().millisecondsSinceEpoch}';
@@ -34,6 +43,12 @@ class MqttService {
   /// Stream of raw payloads received on the parsed-logs topic. Only emits when
   /// the client was created with `subscribeToParsedLogs: true`.
   Stream<String> get parsedLogsStream => _parsedLogsController.stream;
+
+  /// Stream of power command feedback published by the orchestrator. Only
+  /// emits when the client was created with `subscribeToPowerFeedback: true`.
+  /// Malformed payloads are logged and dropped, never emitted.
+  Stream<PowerFeedback> get powerFeedbackStream =>
+      _powerFeedbackController.stream;
 
   /// Check if currently connected
   bool get isConnected => _isConnected;
@@ -115,10 +130,7 @@ class MqttService {
     }
 
     try {
-      final command = CommandLog(
-        commandType: type.value,
-        value: value,
-      );
+      final command = CommandLog(commandType: type.value, value: value);
       final payload = command.toJson();
 
       final builder = MqttClientPayloadBuilder()..addString(payload);
@@ -144,21 +156,29 @@ class MqttService {
     _isReconnecting = false;
     _connectionStatusController.add(true);
 
-    if (_subscribeToParsedLogs) {
-      _subscribeParsedLogs();
-    }
+    _subscribeTopics();
   }
 
-  /// Subscribes to the parsed-logs topic and wires the broker's update stream
-  /// into [parsedLogsStream]. Called on every (re)connect because each connect
-  /// builds a fresh client with its own `updates` stream.
-  void _subscribeParsedLogs() {
+  /// Subscribes to the enabled topics and wires the broker's update stream
+  /// into the matching controllers. Called on every (re)connect because each
+  /// connect builds a fresh client with its own `updates` stream, and because
+  /// subscriptions do not survive the clean session used here.
+  void _subscribeTopics() {
     final client = _client;
-    if (client == null) {
+    if (client == null ||
+        (!_subscribeToParsedLogs && !_subscribeToPowerFeedback)) {
       return;
     }
 
-    client.subscribe(MqttConfig.parsedLogsTopic, MqttQos.atLeastOnce);
+    if (_subscribeToParsedLogs) {
+      client.subscribe(MqttConfig.parsedLogsTopic, MqttQos.atLeastOnce);
+    }
+    if (_subscribeToPowerFeedback) {
+      client.subscribe(
+        MqttConfig.powerFeedbackParsedTopic,
+        MqttQos.atLeastOnce,
+      );
+    }
 
     // Drop any listener bound to a previous (now-dead) client before binding
     // to the current one, so we never leak or double-handle messages.
@@ -166,19 +186,35 @@ class MqttService {
     _updatesSub = client.updates?.listen(_onMessages);
   }
 
-  /// Handles a batch of incoming MQTT messages, forwarding parsed-logs payloads
-  /// to [parsedLogsStream].
+  /// Handles a batch of incoming MQTT messages, routing each payload to the
+  /// controller for its topic.
   void _onMessages(List<MqttReceivedMessage<MqttMessage>> messages) {
     for (final received in messages) {
-      if (received.topic != MqttConfig.parsedLogsTopic) {
+      final topic = received.topic;
+      if (topic != MqttConfig.parsedLogsTopic &&
+          topic != MqttConfig.powerFeedbackParsedTopic) {
         continue;
       }
       final publishMessage = received.payload as MqttPublishMessage;
       final payload = MqttPublishPayload.bytesToStringAsString(
         publishMessage.payload.message,
       );
-      if (!_parsedLogsController.isClosed) {
-        _parsedLogsController.add(payload);
+
+      if (topic == MqttConfig.parsedLogsTopic) {
+        if (!_parsedLogsController.isClosed) {
+          _parsedLogsController.add(payload);
+        }
+        continue;
+      }
+
+      final feedback = PowerFeedback.tryParse(payload);
+      if (feedback == null) {
+        debugPrint('Dropped malformed power feedback: $payload');
+        continue;
+      }
+      debugPrint('Power feedback: $feedback');
+      if (!_powerFeedbackController.isClosed) {
+        _powerFeedbackController.add(feedback);
       }
     }
   }
@@ -240,6 +276,7 @@ class MqttService {
 
     _connectionStatusController.close();
     _parsedLogsController.close();
+    _powerFeedbackController.close();
     _isConnected = false;
   }
 }

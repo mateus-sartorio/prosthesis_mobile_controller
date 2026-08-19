@@ -4,11 +4,13 @@
   "useSSL": false,
   "username": null,
   "password": null,
-  "commandLogsTopic": "prothesis/actions",
-  "parsedLogsTopic": "prothesis/logs/parsed",
+  "commandLogsTopic": "prosthesis/actions",
+  "parsedLogsTopic": "prosthesis/logs/parsed",
+  "powerFeedbackParsedTopic": "prosthesis/actions/feedback/parsed",
   "qos": 1,
-  "clientId": "prothesis-mobile-controller",
+  "clientId": "prosthesis-mobile-controller",
   "connectionTimeoutSeconds": 15,
   "reconnectIntervalSeconds": 5,
-  "maxReconnectAttempts": 10
+  "maxReconnectAttempts": 10,
+  "powerFeedbackTimeoutSeconds": 8
 }

@@ -4,11 +4,13 @@
   "useSSL": true,
   "username": "mateus",
   "password": "MateusTest123",
-  "commandLogsTopic": "prothesis/actions",
-  "parsedLogsTopic": "prothesis/logs/parsed",
+  "commandLogsTopic": "prosthesis/actions",
+  "parsedLogsTopic": "prosthesis/logs/parsed",
+  "powerFeedbackParsedTopic": "prosthesis/actions/feedback/parsed",
   "qos": 1,
-  "clientId": "prothesis-mobile-controller-dev",
+  "clientId": "prosthesis-mobile-controller-dev",
   "connectionTimeoutSeconds": 15,
   "reconnectIntervalSeconds": 5,
-  "maxReconnectAttempts": 10
+  "maxReconnectAttempts": 10,
+  "powerFeedbackTimeoutSeconds": 8
 }

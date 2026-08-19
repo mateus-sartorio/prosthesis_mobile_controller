@@ -13,13 +13,15 @@ class MqttConfig {
   static bool _useSSL = false;
   static String? _username;
   static String? _password;
-  static String _commandLogsTopic = 'prothesis/actions';
-  static String _parsedLogsTopic = 'prothesis/logs/parsed';
+  static String _commandLogsTopic = 'prosthesis/actions';
+  static String _parsedLogsTopic = 'prosthesis/logs/parsed';
+  static String _powerFeedbackParsedTopic = 'prosthesis/actions/feedback/parsed';
   static int _qos = 1;
-  static String _clientId = 'prothesis-mobile-controller';
+  static String _clientId = 'prosthesis-mobile-controller';
   static Duration _connectionTimeout = const Duration(seconds: 15);
   static Duration _reconnectInterval = const Duration(seconds: 5);
   static int _maxReconnectAttempts = 10;
+  static Duration _powerFeedbackTimeout = const Duration(seconds: 8);
 
   static String get environment => _environment;
   static String get host => _host;
@@ -29,11 +31,13 @@ class MqttConfig {
   static String? get password => _password;
   static String get commandLogsTopic => _commandLogsTopic;
   static String get parsedLogsTopic => _parsedLogsTopic;
+  static String get powerFeedbackParsedTopic => _powerFeedbackParsedTopic;
   static int get qos => _qos;
   static String get clientId => _clientId;
   static Duration get connectionTimeout => _connectionTimeout;
   static Duration get reconnectInterval => _reconnectInterval;
   static int get maxReconnectAttempts => _maxReconnectAttempts;
+  static Duration get powerFeedbackTimeout => _powerFeedbackTimeout;
 
   static Future<void> load({String? environment}) async {
     final selectedEnvironment =
@@ -76,6 +80,11 @@ class MqttConfig {
       'parsedLogsTopic',
       fallback: _parsedLogsTopic,
     );
+    _powerFeedbackParsedTopic = readString(
+      decoded,
+      'powerFeedbackParsedTopic',
+      fallback: _powerFeedbackParsedTopic,
+    );
     _qos = readInt(decoded, 'qos', fallback: _qos);
     _clientId = readString(decoded, 'clientId', fallback: _clientId);
     _connectionTimeout = Duration(
@@ -96,6 +105,13 @@ class MqttConfig {
       decoded,
       'maxReconnectAttempts',
       fallback: _maxReconnectAttempts,
+    );
+    _powerFeedbackTimeout = Duration(
+      seconds: readInt(
+        decoded,
+        'powerFeedbackTimeoutSeconds',
+        fallback: _powerFeedbackTimeout.inSeconds,
+      ),
     );
   }
 }
