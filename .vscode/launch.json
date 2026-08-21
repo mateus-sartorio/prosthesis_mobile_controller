@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "prothesis_mobile_controller (dev)",
+            "name": "prosthesis_mobile_controller (dev)",
             "request": "launch",
             "type": "dart",
             "toolArgs": [
@@ -13,7 +13,7 @@
             ]
         },
         {
-            "name": "prothesis_mobile_controller (prod)",
+            "name": "prosthesis_mobile_controller (prod)",
             "request": "launch",
             "type": "dart",
             "toolArgs": [
@@ -21,7 +21,7 @@
             ]
         },
         {
-            "name": "prothesis_mobile_controller (dev profile mode)",
+            "name": "prosthesis_mobile_controller (dev profile mode)",
             "request": "launch",
             "type": "dart",
             "flutterMode": "profile",
@@ -30,7 +30,7 @@
             ]
         },
         {
-            "name": "prothesis_mobile_controller (prod profile mode)",
+            "name": "prosthesis_mobile_controller (prod profile mode)",
             "request": "launch",
             "type": "dart",
             "flutterMode": "profile",
@@ -39,7 +39,7 @@
             ]
         },
         {
-            "name": "prothesis_mobile_controller (dev release mode)",
+            "name": "prosthesis_mobile_controller (dev release mode)",
             "request": "launch",
             "type": "dart",
             "flutterMode": "release",
@@ -48,7 +48,7 @@
             ]
         },
         {
-            "name": "prothesis_mobile_controller (prod release mode)",
+            "name": "prosthesis_mobile_controller (prod release mode)",
             "request": "launch",
             "type": "dart",
             "flutterMode": "release",

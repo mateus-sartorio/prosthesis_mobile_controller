@@ -1,6 +1,6 @@
 {
-    "name": "prothesis_mobile_controller",
-    "short_name": "prothesis_mobile_controller",
+    "name": "prosthesis_mobile_controller",
+    "short_name": "prosthesis_mobile_controller",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

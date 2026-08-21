@@ -151,6 +151,10 @@ class _HomeScreenState extends State<HomeScreen> {
       _pendingCommand = null;
       _lastFeedback = feedback;
       _powerState = feedback.state.isOn ? PowerUiState.on : PowerUiState.off;
+      // The prosthesis reports the gait mode it ended up in, which beats what
+      // the app last asked for: null clears the highlight when it reports a
+      // mode this app doesn't know (including `0` while powered off).
+      _activeMode = feedback.gaitMode;
     });
 
     _showSnackBar(

@@ -1,4 +1,4 @@
-# prothesis_mobile_controller
+# prosthesis_mobile_controller
 
 ## Environment configs
 

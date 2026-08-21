@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="prothesis_mobile_controller"
+        android:label="prosthesis_mobile_controller"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
