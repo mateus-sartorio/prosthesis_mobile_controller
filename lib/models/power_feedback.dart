@@ -79,6 +79,12 @@ class PowerFeedback {
   final PowerFeedbackStatus status;
   final ProsthesisState state;
 
+  /// The gait mode the prosthesis is in *after* the command was handled, as
+  /// the raw wire value. Kept raw because the bridge sends any `u8`: `0` while
+  /// the prosthesis is off, and possibly a mode this app version predates.
+  /// Use [gaitMode] for the resolved enum.
+  final int gait;
+
   /// Human-readable detail from the bridge. Free text and **not** a stable
   /// API: show it and log it, never branch on it.
   final String message;
@@ -88,10 +94,15 @@ class PowerFeedback {
     required this.command,
     required this.status,
     required this.state,
+    required this.gait,
     required this.message,
   });
 
   bool get isSuccess => status.isSuccess;
+
+  /// [gait] as a known [GaitMode], or `null` when the reported value is not
+  /// one (the prosthesis is off, or the bridge is newer than the app).
+  GaitMode? get gaitMode => GaitMode.fromValue(gait);
 
   /// Parses a raw payload, returning `null` when it is malformed (missing
   /// required field, unknown enum value or invalid JSON). Callers should log
@@ -114,12 +125,14 @@ class PowerFeedback {
     final command = PowerCommand.fromWire(decoded['command']);
     final status = PowerFeedbackStatus.fromWire(decoded['status']);
     final state = ProsthesisState.fromWire(decoded['state']);
+    final gait = decoded['gait'];
     final message = decoded['message'];
 
     if (timestamp == null ||
         command == null ||
         status == null ||
         state == null ||
+        gait is! int ||
         message is! String) {
       return null;
     }
@@ -129,6 +142,7 @@ class PowerFeedback {
       command: command,
       status: status,
       state: state,
+      gait: gait,
       message: message,
     );
   }
@@ -137,5 +151,5 @@ class PowerFeedback {
   String toString() =>
       'PowerFeedback(timestamp: $timestamp, command: ${command.wireValue}, '
       'status: ${status.wireValue}, state: ${state.wireValue}, '
-      'message: $message)';
+      'gait: $gait, message: $message)';
 }

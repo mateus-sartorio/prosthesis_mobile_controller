@@ -1,13 +1,13 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:prothesis_mobile_controller/models/action_command.dart';
-import 'package:prothesis_mobile_controller/models/power_feedback.dart';
+import 'package:prosthesis_mobile_controller/models/action_command.dart';
+import 'package:prosthesis_mobile_controller/models/power_feedback.dart';
 
 void main() {
   group('PowerFeedback.tryParse', () {
     test('parses a successful power_on feedback', () {
       final feedback = PowerFeedback.tryParse(
         '{"timestamp": "2026-08-17T12:00:00.421870+00:00", "command": "power_on", '
-        '"status": "success", "state": "on", '
+        '"status": "success", "state": "on", "gait": 3, '
         '"message": "started RoboticLegControl (sudo pid 4312)"}',
       );
 
@@ -15,6 +15,8 @@ void main() {
       expect(feedback!.command, PowerCommand.powerOn);
       expect(feedback.status, PowerFeedbackStatus.success);
       expect(feedback.state, ProsthesisState.on);
+      expect(feedback.gait, 3);
+      expect(feedback.gaitMode, GaitMode.standing);
       expect(feedback.isSuccess, isTrue);
       expect(feedback.message, 'started RoboticLegControl (sudo pid 4312)');
       expect(
@@ -26,7 +28,7 @@ void main() {
     test('parses a failed power_off feedback, keeping the reported state', () {
       final feedback = PowerFeedback.tryParse(
         '{"timestamp": "2026-08-17T12:06:02.774390+00:00", "command": "power_off", '
-        '"status": "failure", "state": "on", '
+        '"status": "failure", "state": "on", "gait": 1, '
         '"message": "RoboticLegControl is still running after kill (pids 4312)"}',
       );
 
@@ -34,12 +36,26 @@ void main() {
       expect(feedback!.command, PowerCommand.powerOff);
       expect(feedback.isSuccess, isFalse);
       expect(feedback.state, ProsthesisState.on);
+      expect(feedback.gaitMode, GaitMode.walking);
+    });
+
+    test('keeps a gait value it cannot map to a known mode', () {
+      final feedback = PowerFeedback.tryParse(
+        '{"timestamp": "2026-08-17T12:06:02.774390+00:00", "command": "power_off", '
+        '"status": "success", "state": "off", "gait": 0, '
+        '"message": "stopped RoboticLegControl"}',
+      );
+
+      expect(feedback, isNotNull);
+      expect(feedback!.gait, 0);
+      expect(feedback.gaitMode, isNull);
     });
 
     test('ignores unknown fields', () {
       final feedback = PowerFeedback.tryParse(
         '{"timestamp": "2026-08-17T12:00:00.421870+00:00", "command": "power_on", '
-        '"status": "success", "state": "on", "message": "ok", "extra": 42}',
+        '"status": "success", "state": "on", "gait": 1, "message": "ok", '
+        '"extra": 42}',
       );
 
       expect(feedback, isNotNull);
@@ -49,15 +65,23 @@ void main() {
     test('returns null for malformed payloads', () {
       const missingField =
           '{"timestamp": "2026-08-17T12:00:00.421870+00:00", "command": "power_on", '
-          '"status": "success", "state": "on"}';
+          '"status": "success", "state": "on", "gait": 1}';
+      const missingGait =
+          '{"timestamp": "2026-08-17T12:00:00.421870+00:00", "command": "power_on", '
+          '"status": "success", "state": "on", "message": "ok"}';
+      const badGait =
+          '{"timestamp": "2026-08-17T12:00:00.421870+00:00", "command": "power_on", '
+          '"status": "success", "state": "on", "gait": "1", "message": "ok"}';
       const unknownEnum =
           '{"timestamp": "2026-08-17T12:00:00.421870+00:00", "command": "reboot", '
-          '"status": "success", "state": "on", "message": "ok"}';
+          '"status": "success", "state": "on", "gait": 1, "message": "ok"}';
       const badTimestamp =
           '{"timestamp": "not a date", "command": "power_on", '
-          '"status": "success", "state": "on", "message": "ok"}';
+          '"status": "success", "state": "on", "gait": 1, "message": "ok"}';
 
       expect(PowerFeedback.tryParse(missingField), isNull);
+      expect(PowerFeedback.tryParse(missingGait), isNull);
+      expect(PowerFeedback.tryParse(badGait), isNull);
       expect(PowerFeedback.tryParse(unknownEnum), isNull);
       expect(PowerFeedback.tryParse(badTimestamp), isNull);
       expect(PowerFeedback.tryParse('not json'), isNull);
@@ -70,5 +94,14 @@ void main() {
     expect(PowerCommand.forState(PowerState.off), PowerCommand.powerOff);
     expect(PowerCommand.powerOn.requestedState, PowerState.on);
     expect(PowerCommand.powerOff.requestedState, PowerState.off);
+  });
+
+  test('GaitMode.fromValue maps wire values to modes', () {
+    for (final mode in GaitMode.values) {
+      expect(GaitMode.fromValue(mode.value), mode);
+    }
+    expect(GaitMode.fromValue(0), isNull);
+    expect(GaitMode.fromValue(99), isNull);
+    expect(GaitMode.fromValue('1'), isNull);
   });
 }

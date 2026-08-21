@@ -69,6 +69,17 @@ enum GaitMode {
         return 'Stand to Sit';
     }
   }
+
+  /// The gait mode with this wire value, or `null` when the value is not one
+  /// the app knows about (feedback reports `0` while the prosthesis is off).
+  static GaitMode? fromValue(Object? value) {
+    for (final mode in GaitMode.values) {
+      if (mode.value == value) {
+        return mode;
+      }
+    }
+    return null;
+  }
 }
 
 class CommandLog {

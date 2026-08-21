@@ -1,4 +1,4 @@
-package com.example.prothesis_mobile_controller
+package com.example.prosthesis_mobile_controller
 
 import io.flutter.embedding.android.FlutterActivity
 
