@@ -26,11 +26,24 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isConnected = false;
   bool _isConnecting = false;
   PowerUiState _powerState = _assumedInitialState;
+
+  /// The power command in flight, never [PowerCommand.setGait] - gait commands
+  /// are tracked by [_pendingMode].
   PowerCommand? _pendingCommand;
   Timer? _feedbackTimer;
   StreamSubscription<PowerFeedback>? _feedbackSub;
   PowerFeedback? _lastFeedback;
+
+  /// The gait mode the prosthesis last confirmed it is running, and the one a
+  /// command is in flight for. Like the power state, [_activeMode] is only
+  /// ever written from feedback.
   GaitMode? _activeMode;
+  GaitMode? _pendingMode;
+  Timer? _gaitFeedbackTimer;
+
+  /// True while any command is waiting for its feedback. Only one is ever in
+  /// flight: feedback carries no correlation id, so matching relies on that.
+  bool get _isCommandPending => _pendingCommand != null || _pendingMode != null;
 
   /// The power state assumed before any feedback has been received. There is
   /// no way to query the prosthesis, so the app assumes it starts off instead
@@ -101,11 +114,16 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _isConnected = isConnected;
         _isConnecting = false;
+        if (!isConnected) {
+          // Feedback produced while we are offline is lost, so the gait we
+          // last saw confirmed cannot be trusted either.
+          _activeMode = null;
+        }
       });
       if (!isConnected) {
         // Feedback produced while we are offline is lost, so anything we
         // believed about the power state can no longer be trusted.
-        _resetPowerState();
+        _resetPendingCommands();
       }
     });
     _feedbackSub = _mqttService.powerFeedbackStream.listen(_onPowerFeedback);
@@ -115,27 +133,51 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Drops any in-flight command and falls back to a state we can defend:
   /// once feedback has been seen, missing it makes the state genuinely
   /// unknown; before that the app stays on the assumed initial state.
-  void _resetPowerState() {
+  void _resetPendingCommands() {
     _feedbackTimer?.cancel();
     _feedbackTimer = null;
+    _gaitFeedbackTimer?.cancel();
+    _gaitFeedbackTimer = null;
     if (!mounted) {
       return;
     }
     setState(() {
       _pendingCommand = null;
+      _pendingMode = null;
       _powerState = _lastFeedback == null
           ? _assumedInitialState
           : PowerUiState.unknown;
     });
   }
 
-  /// Applies a feedback message. Feedback is the only writer of the power
-  /// state: the toggle is never flipped optimistically when publishing.
+  /// Routes a feedback message to the handler for the command it answers.
+  /// Feedback is the only writer of the power state and the active gait mode:
+  /// neither is set optimistically when publishing.
   void _onPowerFeedback(PowerFeedback feedback) {
     if (!mounted) {
       return;
     }
+    if (feedback.command == PowerCommand.setGait) {
+      _onGaitFeedback(feedback);
+    } else {
+      _onPowerCommandFeedback(feedback);
+    }
+  }
 
+  /// Copies the prosthesis state a feedback reports into the UI state. Must be
+  /// called from inside a [setState] callback.
+  void _applyFeedback(PowerFeedback feedback) {
+    _lastFeedback = feedback;
+    _powerState = feedback.state.isOn ? PowerUiState.on : PowerUiState.off;
+    // A gait only runs while the prosthesis is on, and a failed command leaves
+    // it unclear which gait (if any) survived - both show as no active mode
+    // rather than one that may not be running.
+    _activeMode = feedback.isSuccess && feedback.state.isOn
+        ? feedback.gaitMode
+        : null;
+  }
+
+  void _onPowerCommandFeedback(PowerFeedback feedback) {
     final pending = _pendingCommand;
     if (pending != null && pending != feedback.command) {
       // Not the answer we are waiting for (stale, or another controller's
@@ -149,12 +191,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     setState(() {
       _pendingCommand = null;
-      _lastFeedback = feedback;
-      _powerState = feedback.state.isOn ? PowerUiState.on : PowerUiState.off;
-      // The prosthesis reports the gait mode it ended up in, which beats what
-      // the app last asked for: null clears the highlight when it reports a
-      // mode this app doesn't know (including `0` while powered off).
-      _activeMode = feedback.gaitMode;
+      _applyFeedback(feedback);
     });
 
     _showSnackBar(
@@ -164,6 +201,40 @@ class _HomeScreenState extends State<HomeScreen> {
       feedback.isSuccess ? const Color(0xFF22C55E) : const Color(0xFFEF4444),
       duration: feedback.isSuccess
           ? const Duration(seconds: 3)
+          : const Duration(seconds: 6),
+    );
+  }
+
+  /// Applies the answer to a gait command. The bridge reports the gait it
+  /// holds even when the restart failed, so a feedback for the mode we asked
+  /// for is ours whether it succeeded or not.
+  void _onGaitFeedback(PowerFeedback feedback) {
+    final pending = _pendingMode;
+    if (pending != null && feedback.gaitMode != pending) {
+      // Not the answer we are waiting for (stale, or another controller's
+      // command). Keep waiting for ours rather than settling on this one.
+      debugPrint('Ignoring unmatched gait feedback: $feedback');
+      return;
+    }
+
+    _gaitFeedbackTimer?.cancel();
+    _gaitFeedbackTimer = null;
+
+    setState(() {
+      _pendingMode = null;
+      _applyFeedback(feedback);
+    });
+
+    final mode = feedback.gaitMode;
+    _showSnackBar(
+      feedback.isSuccess
+          ? '${mode?.label ?? 'Gait ${feedback.gait}'} activated'
+          : 'Gait change failed: ${feedback.message}',
+      feedback.isSuccess
+          ? (mode == null ? const Color(0xFF22C55E) : _modeConfig[mode]!.color)
+          : const Color(0xFFEF4444),
+      duration: feedback.isSuccess
+          ? const Duration(seconds: 2)
           : const Duration(seconds: 6),
     );
   }
@@ -181,6 +252,24 @@ class _HomeScreenState extends State<HomeScreen> {
     });
     _showSnackBar(
       'No response from prosthesis - power state unknown',
+      const Color(0xFFF59E0B),
+      duration: const Duration(seconds: 4),
+    );
+  }
+
+  /// No answer within the timeout: the requested mode may or may not be
+  /// running, so no mode is shown as active rather than the one asked for.
+  void _onGaitFeedbackTimeout() {
+    _gaitFeedbackTimer = null;
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _pendingMode = null;
+      _activeMode = null;
+    });
+    _showSnackBar(
+      'No response from prosthesis - gait mode unknown',
       const Color(0xFFF59E0B),
       duration: const Duration(seconds: 4),
     );
@@ -227,11 +316,11 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  /// Publishes a power command and waits for its feedback. Only one power
-  /// command is ever in flight: feedback carries no correlation id, so
-  /// matching relies on that discipline.
+  /// Publishes a power command and waits for its feedback. Only one command is
+  /// ever in flight: feedback carries no correlation id, so matching relies on
+  /// that discipline.
   Future<void> _sendPowerCommand(PowerState powerState) async {
-    if (_pendingCommand != null || !_isConnected) {
+    if (_isCommandPending || !_isConnected) {
       return;
     }
 
@@ -252,33 +341,37 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     } catch (e) {
       // The command never left the phone, so no feedback is coming.
-      _resetPowerState();
+      _resetPendingCommands();
       _showSnackBar('Failed to send command: $e', Colors.red);
     }
   }
 
+  /// Publishes a gait command and waits for its feedback, the same way
+  /// [_sendPowerCommand] does: the card is never highlighted optimistically,
+  /// and only one command is in flight at a time.
   Future<void> _handleModeSelect(GaitMode mode) async {
+    if (_isCommandPending || !_isConnected) {
+      return;
+    }
+
+    setState(() => _pendingMode = mode);
+
     try {
       await _mqttService.publishAction(mode.value);
-      setState(() => _activeMode = mode);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${mode.label} activated'),
-            duration: const Duration(seconds: 1),
-            backgroundColor: _modeConfig[mode]!.color,
-          ),
-        );
-      }
+      _gaitFeedbackTimer?.cancel();
+      _gaitFeedbackTimer = Timer(
+        MqttConfig.powerFeedbackTimeout,
+        _onGaitFeedbackTimeout,
+      );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to send command: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+      // The command never left the phone, so no feedback is coming.
+      _gaitFeedbackTimer?.cancel();
+      _gaitFeedbackTimer = null;
+      if (!mounted) {
+        return;
       }
+      setState(() => _pendingMode = null);
+      _showSnackBar('Failed to send command: $e', Colors.red);
     }
   }
 
@@ -368,7 +461,7 @@ class _HomeScreenState extends State<HomeScreen> {
     required Color color,
   }) {
     final isPending = _powerState == PowerUiState.pending;
-    final enabled = _isConnected && !isPending;
+    final enabled = _isConnected && !_isCommandPending;
 
     return ElevatedButton.icon(
       onPressed: enabled ? () => _sendPowerCommand(target) : null,
@@ -465,7 +558,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: buttonTarget == PowerState.on
                     ? const Color(0xFF22C55E)
                     : const Color(0xFFEF4444),
-              )
+              ),
           ],
         ),
       ),
@@ -475,7 +568,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildModeCard(GaitMode mode) {
     final cfg = _modeConfig[mode]!;
     final isActive = _activeMode == mode;
-    final enabled = _isConnected;
+    final isPending = _pendingMode == mode;
+    final enabled = _isConnected && !_isCommandPending;
 
     return GestureDetector(
       onTap: enabled ? () => _handleModeSelect(mode) : null,
@@ -485,7 +579,7 @@ class _HomeScreenState extends State<HomeScreen> {
           color: isActive ? cfg.color : const Color(0xFF1E293B),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isActive
+            color: isActive || isPending
                 ? cfg.color
                 : enabled
                 ? const Color(0xFF334155)
@@ -503,17 +597,28 @@ class _HomeScreenState extends State<HomeScreen> {
               : null,
         ),
         child: Opacity(
-          opacity: enabled ? 1.0 : 0.35,
+          // The card waiting for its feedback stays lit while the others dim.
+          opacity: enabled || isPending ? 1.0 : 0.35,
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  cfg.icon,
-                  size: 28,
-                  color: isActive ? Colors.white : cfg.color,
-                ),
+                if (isPending)
+                  SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: cfg.color,
+                    ),
+                  )
+                else
+                  Icon(
+                    cfg.icon,
+                    size: 28,
+                    color: isActive ? Colors.white : cfg.color,
+                  ),
                 const SizedBox(height: 8),
                 Text(
                   mode.label,
@@ -538,6 +643,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _feedbackTimer?.cancel();
+    _gaitFeedbackTimer?.cancel();
     _feedbackSub?.cancel();
     _mqttService.dispose();
     super.dispose();
@@ -576,7 +682,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   Padding(
                     padding: const EdgeInsets.only(bottom: 16, top: 4),
                     child: Text(
-                      _activeMode != null
+                      _pendingMode != null
+                          ? 'Switching to ${_pendingMode!.label}...'
+                          : _activeMode != null
                           ? 'Active: ${_activeMode!.label}'
                           : 'Select a gait mode',
                       style: const TextStyle(

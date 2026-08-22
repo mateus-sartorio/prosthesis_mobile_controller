@@ -19,10 +19,7 @@ void main() {
       expect(feedback.gaitMode, GaitMode.standing);
       expect(feedback.isSuccess, isTrue);
       expect(feedback.message, 'started RoboticLegControl (sudo pid 4312)');
-      expect(
-        feedback.timestamp,
-        DateTime.utc(2026, 8, 17, 12, 0, 0, 421, 870),
-      );
+      expect(feedback.timestamp, DateTime.utc(2026, 8, 17, 12, 0, 0, 421, 870));
     });
 
     test('parses a failed power_off feedback, keeping the reported state', () {
@@ -37,6 +34,34 @@ void main() {
       expect(feedback.isSuccess, isFalse);
       expect(feedback.state, ProsthesisState.on);
       expect(feedback.gaitMode, GaitMode.walking);
+    });
+
+    test('parses a set_gait feedback', () {
+      final feedback = PowerFeedback.tryParse(
+        '{"timestamp": "2026-08-17T12:03:00.100000+00:00", "command": "set_gait", '
+        '"status": "success", "state": "on", "gait": 4, '
+        '"message": "stopped RoboticLegControl; started with gait 4"}',
+      );
+
+      expect(feedback, isNotNull);
+      expect(feedback!.command, PowerCommand.setGait);
+      expect(feedback.isSuccess, isTrue);
+      expect(feedback.state, ProsthesisState.on);
+      expect(feedback.gaitMode, GaitMode.stairDescent);
+    });
+
+    test('parses a failed set_gait feedback', () {
+      final feedback = PowerFeedback.tryParse(
+        '{"timestamp": "2026-08-17T12:03:00.100000+00:00", "command": "set_gait", '
+        '"status": "failure", "state": "off", "gait": 4, '
+        '"message": "failed to start RoboticLegControl"}',
+      );
+
+      expect(feedback, isNotNull);
+      expect(feedback!.command, PowerCommand.setGait);
+      expect(feedback.isSuccess, isFalse);
+      expect(feedback.state, ProsthesisState.off);
+      expect(feedback.gaitMode, GaitMode.stairDescent);
     });
 
     test('keeps a gait value it cannot map to a known mode', () {
@@ -94,6 +119,7 @@ void main() {
     expect(PowerCommand.forState(PowerState.off), PowerCommand.powerOff);
     expect(PowerCommand.powerOn.requestedState, PowerState.on);
     expect(PowerCommand.powerOff.requestedState, PowerState.off);
+    expect(PowerCommand.setGait.requestedState, isNull);
   });
 
   test('GaitMode.fromValue maps wire values to modes', () {

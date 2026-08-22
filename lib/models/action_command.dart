@@ -71,7 +71,7 @@ enum GaitMode {
   }
 
   /// The gait mode with this wire value, or `null` when the value is not one
-  /// the app knows about (feedback reports `0` while the prosthesis is off).
+  /// the app knows about (a prosthesis newer than this app).
   static GaitMode? fromValue(Object? value) {
     for (final mode in GaitMode.values) {
       if (mode.value == value) {
