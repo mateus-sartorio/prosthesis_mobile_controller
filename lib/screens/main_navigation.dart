@@ -15,6 +15,10 @@ class MainNavigation extends StatefulWidget {
 }
 
 class _MainNavigationState extends State<MainNavigation> {
+  /// Temporarily hides the Versions tab (and [ReleasesScreen] with it) without
+  /// removing the feature. Flip back to `true` to bring the tab back.
+  static const bool _showReleasesTab = false;
+
   int _currentIndex = 0;
 
   @override
@@ -22,10 +26,26 @@ class _MainNavigationState extends State<MainNavigation> {
     // Rebuilt each frame so [SensorsScreen] gets an up-to-date `isActive` flag
     // (it gates its 10 Hz sampling on visibility). HomeScreen/ReleasesScreen
     // are const, so they're canonicalized and keep their state across rebuilds.
-    final screens = [
+    final screens = <Widget>[
       const HomeScreen(),
       SensorsScreen(isActive: _currentIndex == 1),
-      const ReleasesScreen(),
+      if (_showReleasesTab) const ReleasesScreen(),
+    ];
+
+    const items = <BottomNavigationBarItem>[
+      BottomNavigationBarItem(
+        icon: Icon(Icons.directions_walk_rounded),
+        label: 'Control',
+      ),
+      BottomNavigationBarItem(
+        icon: Icon(Icons.show_chart_rounded),
+        label: 'Sensors',
+      ),
+      if (_showReleasesTab)
+        BottomNavigationBarItem(
+          icon: Icon(Icons.system_update_rounded),
+          label: 'Versions',
+        ),
     ];
 
     return Scaffold(
@@ -43,20 +63,7 @@ class _MainNavigationState extends State<MainNavigation> {
           selectedItemColor: const Color(0xFF2563EB),
           unselectedItemColor: const Color(0xFF64748B),
           selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.directions_walk_rounded),
-              label: 'Control',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.show_chart_rounded),
-              label: 'Sensors',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.system_update_rounded),
-              label: 'Versions',
-            ),
-          ],
+          items: items,
         ),
       ),
     );

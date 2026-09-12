@@ -10,9 +10,10 @@ import '../models/power_feedback.dart';
 /// What the UI knows about the prosthesis power state.
 ///
 /// The prosthesis cannot be queried, so the app starts from the assumed
-/// [_HomeScreenState._assumedInitialState] ([off]) and only reaches [unknown]
-/// when a command it sent went unanswered.
-enum PowerUiState { unknown, pending, on, off }
+/// [_HomeScreenState._assumedInitialState] ([off]) and falls back to it
+/// whenever a command it sent goes unanswered. There is deliberately no
+/// indeterminate state: anything the app cannot confirm is shown as [off].
+enum PowerUiState { pending, on, off }
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -32,7 +33,6 @@ class _HomeScreenState extends State<HomeScreen> {
   PowerCommand? _pendingCommand;
   Timer? _feedbackTimer;
   StreamSubscription<PowerFeedback>? _feedbackSub;
-  PowerFeedback? _lastFeedback;
 
   /// The gait mode the prosthesis last confirmed it is running, and the one a
   /// command is in flight for. Like the power state, [_activeMode] is only
@@ -41,24 +41,39 @@ class _HomeScreenState extends State<HomeScreen> {
   GaitMode? _pendingMode;
   Timer? _gaitFeedbackTimer;
 
+  /// The actuator current the prosthesis last confirmed, in milliamps, and the
+  /// value a command is in flight for. Like the power state,
+  /// [_currentMilliamps] is only ever written from feedback.
+  int _currentMilliamps = ActuatorCurrent.assumedInitialMilliamps;
+  int? _pendingMilliamps;
+  Timer? _currentFeedbackTimer;
+
+  /// Where the slider's thumb sits. Follows the finger while dragging, so it
+  /// runs ahead of [_currentMilliamps] until feedback confirms the setpoint
+  /// (and snaps back to it when one is not confirmed).
+  int _sliderMilliamps = ActuatorCurrent.assumedInitialMilliamps;
+
   /// True while any command is waiting for its feedback. Only one is ever in
   /// flight: feedback carries no correlation id, so matching relies on that.
-  bool get _isCommandPending => _pendingCommand != null || _pendingMode != null;
+  bool get _isCommandPending =>
+      _pendingCommand != null ||
+      _pendingMode != null ||
+      _pendingMilliamps != null;
 
-  /// The power state assumed before any feedback has been received. There is
-  /// no way to query the prosthesis, so the app assumes it starts off instead
-  /// of showing a neutral state.
+  /// The power state assumed whenever the app has nothing confirmed to show:
+  /// before any feedback has been received, and again after a command goes
+  /// unanswered. There is no way to query the prosthesis, so it is assumed to
+  /// be off rather than shown as indeterminate.
   static const _assumedInitialState = PowerUiState.off;
 
-  /// Which command the single power button sends, or `null` when the state is
-  /// unknown and both commands should be offered instead. While a command is
-  /// pending the button keeps showing that command, disabled.
-  PowerState? get _commandButtonTarget {
+  /// Which command the single power button sends. While a command is pending
+  /// the button keeps showing that command, disabled.
+  PowerState get _commandButtonTarget {
     switch (_powerState) {
-      case PowerUiState.unknown:
-        return null;
       case PowerUiState.pending:
-        return _pendingCommand?.requestedState;
+        // A pending power state always carries its command; the fallback only
+        // guards the impossible case, and matches the assumed-off state.
+        return _pendingCommand?.requestedState ?? PowerState.on;
       case PowerUiState.on:
         return PowerState.off;
       case PowerUiState.off:
@@ -130,23 +145,27 @@ class _HomeScreenState extends State<HomeScreen> {
     await _connectMqtt();
   }
 
-  /// Drops any in-flight command and falls back to a state we can defend:
-  /// once feedback has been seen, missing it makes the state genuinely
-  /// unknown; before that the app stays on the assumed initial state.
+  /// Drops any in-flight command and falls back to [_assumedInitialState]:
+  /// with nothing confirmed, the prosthesis is treated as off. The actuator
+  /// current goes back to its assumed default for the same reason - feedback
+  /// missed while offline means the confirmed value can no longer be trusted.
   void _resetPendingCommands() {
     _feedbackTimer?.cancel();
     _feedbackTimer = null;
     _gaitFeedbackTimer?.cancel();
     _gaitFeedbackTimer = null;
+    _currentFeedbackTimer?.cancel();
+    _currentFeedbackTimer = null;
     if (!mounted) {
       return;
     }
     setState(() {
       _pendingCommand = null;
       _pendingMode = null;
-      _powerState = _lastFeedback == null
-          ? _assumedInitialState
-          : PowerUiState.unknown;
+      _powerState = _assumedInitialState;
+      _pendingMilliamps = null;
+      _currentMilliamps = ActuatorCurrent.assumedInitialMilliamps;
+      _sliderMilliamps = _currentMilliamps;
     });
   }
 
@@ -157,17 +176,20 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted) {
       return;
     }
-    if (feedback.command == PowerCommand.setGait) {
-      _onGaitFeedback(feedback);
-    } else {
-      _onPowerCommandFeedback(feedback);
+    switch (feedback.command) {
+      case PowerCommand.setGait:
+        _onGaitFeedback(feedback);
+      case PowerCommand.setActuatorCurrent:
+        _onCurrentFeedback(feedback);
+      case PowerCommand.powerOn:
+      case PowerCommand.powerOff:
+        _onPowerCommandFeedback(feedback);
     }
   }
 
   /// Copies the prosthesis state a feedback reports into the UI state. Must be
   /// called from inside a [setState] callback.
   void _applyFeedback(PowerFeedback feedback) {
-    _lastFeedback = feedback;
     _powerState = feedback.state.isOn ? PowerUiState.on : PowerUiState.off;
     // A gait only runs while the prosthesis is on, and a failed command leaves
     // it unclear which gait (if any) survived - both show as no active mode
@@ -239,7 +261,41 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// No answer within the timeout: the prosthesis state is unknown, not the
+  /// Applies the answer to an actuator-current command. Feedback carries no
+  /// current value, so what gets confirmed is the setpoint we asked for - and
+  /// only when the command succeeded: a failure leaves the prosthesis on the
+  /// current it already had, so the slider goes back to that.
+  void _onCurrentFeedback(PowerFeedback feedback) {
+    final pending = _pendingMilliamps;
+
+    _currentFeedbackTimer?.cancel();
+    _currentFeedbackTimer = null;
+
+    setState(() {
+      _pendingMilliamps = null;
+      // With no pending setpoint this is another controller's command (or a
+      // stale one) and its new current is unknowable, so only the power and
+      // gait state it reports are taken from it.
+      if (pending != null && feedback.isSuccess) {
+        _currentMilliamps = pending;
+      }
+      _sliderMilliamps = _currentMilliamps;
+      _applyFeedback(feedback);
+    });
+
+    _showSnackBar(
+      feedback.isSuccess
+          ? 'Actuator current set to $_currentMilliamps mA'
+          : 'Current change failed: ${feedback.message}',
+      feedback.isSuccess ? const Color(0xFF22C55E) : const Color(0xFFEF4444),
+      duration: feedback.isSuccess
+          ? const Duration(seconds: 2)
+          : const Duration(seconds: 6),
+    );
+  }
+
+  /// No answer within the timeout: the command is not confirmed, so the app
+  /// falls back to assuming the prosthesis is off rather than showing the
   /// state we asked for.
   void _onFeedbackTimeout() {
     _feedbackTimer = null;
@@ -248,10 +304,10 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     setState(() {
       _pendingCommand = null;
-      _powerState = PowerUiState.unknown;
+      _powerState = _assumedInitialState;
     });
     _showSnackBar(
-      'No response from prosthesis - power state unknown',
+      'No response from prosthesis - assuming it is off',
       const Color(0xFFF59E0B),
       duration: const Duration(seconds: 4),
     );
@@ -270,6 +326,24 @@ class _HomeScreenState extends State<HomeScreen> {
     });
     _showSnackBar(
       'No response from prosthesis - gait mode unknown',
+      const Color(0xFFF59E0B),
+      duration: const Duration(seconds: 4),
+    );
+  }
+
+  /// No answer within the timeout: the setpoint may or may not have been
+  /// taken, so the slider returns to the last value the prosthesis confirmed.
+  void _onCurrentFeedbackTimeout() {
+    _currentFeedbackTimer = null;
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _pendingMilliamps = null;
+      _sliderMilliamps = _currentMilliamps;
+    });
+    _showSnackBar(
+      'No response from prosthesis - actuator current unchanged',
       const Color(0xFFF59E0B),
       duration: const Duration(seconds: 4),
     );
@@ -375,6 +449,49 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// Publishes an actuator-current setpoint and waits for its feedback, the
+  /// same way [_sendPowerCommand] does: [_currentMilliamps] is never moved
+  /// optimistically, and only one command is in flight at a time.
+  Future<void> _sendCurrentCommand(int milliamps) async {
+    final target = ActuatorCurrent.clamp(milliamps);
+
+    if (_isCommandPending || !_isConnected) {
+      // The slider is disabled in both cases, so this only guards a drag that
+      // was already under way when the state changed: put the thumb back.
+      setState(() => _sliderMilliamps = _currentMilliamps);
+      return;
+    }
+    if (target == _currentMilliamps) {
+      return;
+    }
+
+    setState(() => _pendingMilliamps = target);
+
+    try {
+      await _mqttService.publishAction(
+        target,
+        type: CommandType.actuatorCurrent,
+      );
+      _currentFeedbackTimer?.cancel();
+      _currentFeedbackTimer = Timer(
+        MqttConfig.powerFeedbackTimeout,
+        _onCurrentFeedbackTimeout,
+      );
+    } catch (e) {
+      // The command never left the phone, so no feedback is coming.
+      _currentFeedbackTimer?.cancel();
+      _currentFeedbackTimer = null;
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _pendingMilliamps = null;
+        _sliderMilliamps = _currentMilliamps;
+      });
+      _showSnackBar('Failed to send command: $e', Colors.red);
+    }
+  }
+
   Widget _buildStatusBar(AppLocalizations l10n) {
     final statusColor = _isConnected
         ? const Color(0xFF22C55E)
@@ -421,8 +538,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// Label and color for the current power state. [PowerUiState.unknown] is a
-  /// real, neutral state - never rendered as "off".
+  /// Label and color for the current power state.
   ({String label, Color color, IconData icon}) get _powerStatePresentation {
     switch (_powerState) {
       case PowerUiState.on:
@@ -444,12 +560,6 @@ class _HomeScreenState extends State<HomeScreen> {
               : 'Stopping...',
           color: const Color(0xFF38BDF8),
           icon: Icons.hourglass_top_rounded,
-        );
-      case PowerUiState.unknown:
-        return (
-          label: 'Power state unknown',
-          color: const Color(0xFF94A3B8),
-          icon: Icons.help_outline_rounded,
         );
     }
   }
@@ -481,22 +591,21 @@ class _HomeScreenState extends State<HomeScreen> {
         foregroundColor: Colors.white,
         disabledBackgroundColor: const Color(0xFF334155),
         disabledForegroundColor: const Color(0xFF94A3B8),
-        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 18),
         shape: const StadiumBorder(),
       ),
     );
   }
 
-  /// The power controls: a state chip, the command button(s) and the last
-  /// feedback message. While the state is unknown both commands are offered,
-  /// since there is nothing to toggle away from.
+  /// The power controls: a state chip and the single command button that
+  /// toggles away from the current state.
   Widget _buildPowerSection() {
     final presentation = _powerStatePresentation;
     final buttonTarget = _commandButtonTarget;
 
     return Center(
       child: Padding(
-        padding: const EdgeInsets.only(bottom: 16, top: 4),
+        padding: const EdgeInsets.only(bottom: 14, top: 4),
         child: Column(
           children: [
             Container(
@@ -524,43 +633,118 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 14),
-            if (buttonTarget == null)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Flexible(
-                    child: _buildPowerButton(
-                      target: PowerState.on,
-                      label: 'Start',
-                      icon: Icons.play_arrow_rounded,
-                      color: const Color(0xFF22C55E),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Flexible(
-                    child: _buildPowerButton(
-                      target: PowerState.off,
-                      label: 'Stop',
-                      icon: Icons.stop_rounded,
-                      color: const Color(0xFFEF4444),
-                    ),
-                  ),
-                ],
-              )
-            else
-              _buildPowerButton(
-                target: buttonTarget,
-                label: buttonTarget == PowerState.on ? 'Start' : 'Stop',
-                icon: buttonTarget == PowerState.on
-                    ? Icons.play_arrow_rounded
-                    : Icons.stop_rounded,
-                color: buttonTarget == PowerState.on
-                    ? const Color(0xFF22C55E)
-                    : const Color(0xFFEF4444),
-              ),
+            const SizedBox(height: 12),
+            _buildPowerButton(
+              target: buttonTarget,
+              label: buttonTarget == PowerState.on ? 'Start' : 'Stop',
+              icon: buttonTarget == PowerState.on
+                  ? Icons.play_arrow_rounded
+                  : Icons.stop_rounded,
+              color: buttonTarget == PowerState.on
+                  ? const Color(0xFF22C55E)
+                  : const Color(0xFFEF4444),
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// The actuator current setpoint: a readout and a slider over the range the
+  /// prosthesis accepts. The command is sent once, when the drag ends, rather
+  /// than on every pixel of movement.
+  Widget _buildCurrentSection() {
+    final pending = _pendingMilliamps;
+    final enabled = _isConnected && !_isCommandPending;
+    final accent = pending != null
+        ? const Color(0xFF38BDF8)
+        : const Color(0xFF2563EB);
+
+    // The inset is on the section as a whole so the heading, the readout and
+    // the bound labels all line up with the ends of the track.
+    return Padding(
+      padding: const EdgeInsets.only(left: 20, right: 20, bottom: 2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.bolt_rounded,
+                size: 16,
+                color: Color(0xFF94A3B8),
+              ),
+              const SizedBox(width: 6),
+              const Text(
+                'Actuator current',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF94A3B8),
+                ),
+              ),
+              const Spacer(),
+              Text(
+                pending != null
+                    ? 'Setting $pending mA...'
+                    : '$_sliderMilliamps mA',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: enabled || pending != null
+                      ? accent
+                      : const Color(0xFF64748B),
+                ),
+              ),
+            ],
+          ),
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              // The slider's own 48px tap slab is more height than the
+              // screen can spare; the row above it keeps the control easy to
+              // find, and the section's inset keeps the thumb off the edges.
+              padding: EdgeInsets.zero,
+              trackHeight: 4,
+              activeTrackColor: accent,
+              inactiveTrackColor: const Color(0xFF1E293B),
+              thumbColor: accent,
+              overlayColor: accent.withValues(alpha: 0.15),
+              valueIndicatorColor: accent,
+              disabledActiveTrackColor: const Color(0xFF334155),
+              disabledInactiveTrackColor: const Color(0xFF1E293B),
+              disabledThumbColor: const Color(0xFF475569),
+            ),
+            child: Slider(
+              value: _sliderMilliamps.toDouble(),
+              min: ActuatorCurrent.minMilliamps.toDouble(),
+              max: ActuatorCurrent.maxMilliamps.toDouble(),
+              divisions: ActuatorCurrent.divisions,
+              label: '$_sliderMilliamps mA',
+              onChanged: enabled
+                  ? (value) => setState(
+                      () => _sliderMilliamps = ActuatorCurrent.clamp(value),
+                    )
+                  : null,
+              onChangeEnd: enabled
+                  ? (value) => _sendCurrentCommand(value.round())
+                  : null,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '${ActuatorCurrent.minMilliamps} mA',
+                style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+              ),
+              Text(
+                '${ActuatorCurrent.maxMilliamps} mA',
+                style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -600,7 +784,7 @@ class _HomeScreenState extends State<HomeScreen> {
           // The card waiting for its feedback stays lit while the others dim.
           opacity: enabled || isPending ? 1.0 : 0.35,
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -619,7 +803,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     size: 28,
                     color: isActive ? Colors.white : cfg.color,
                   ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Text(
                   mode.label,
                   textAlign: TextAlign.center,
@@ -644,6 +828,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _feedbackTimer?.cancel();
     _gaitFeedbackTimer?.cancel();
+    _currentFeedbackTimer?.cancel();
     _feedbackSub?.cancel();
     _mqttService.dispose();
     super.dispose();
@@ -674,13 +859,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildPowerSection(),
+                  _buildCurrentSection(),
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 16, top: 4),
+                    padding: const EdgeInsets.only(bottom: 10, top: 2),
                     child: Text(
                       _pendingMode != null
                           ? 'Switching to ${_pendingMode!.label}...'
@@ -694,13 +880,40 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                   ),
+                  // The cards fill the height left below the label, so the
+                  // three rows end exactly at the bottom of the screen and
+                  // nothing scrolls. Below [minCellHeight] - a screen too
+                  // short for that - the grid scrolls rather than squashing
+                  // the cards.
                   Expanded(
-                    child: GridView.count(
-                      crossAxisCount: 3,
-                      mainAxisSpacing: 12,
-                      crossAxisSpacing: 12,
-                      childAspectRatio: 0.9,
-                      children: GaitMode.values.map(_buildModeCard).toList(),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        const columns = 3;
+                        const spacing = 10.0;
+                        const minCellHeight = 86.0;
+
+                        final rows = (GaitMode.values.length / columns).ceil();
+                        final gaps = spacing * (rows - 1);
+                        final cellWidth =
+                            (constraints.maxWidth - spacing * (columns - 1)) /
+                            columns;
+                        final cellHeight =
+                            ((constraints.maxHeight - gaps) / rows).clamp(
+                              minCellHeight,
+                              double.infinity,
+                            );
+
+                        return GridView.count(
+                          crossAxisCount: columns,
+                          mainAxisSpacing: spacing,
+                          crossAxisSpacing: spacing,
+                          childAspectRatio: cellWidth / cellHeight,
+                          padding: EdgeInsets.zero,
+                          children: GaitMode.values
+                              .map(_buildModeCard)
+                              .toList(),
+                        );
+                      },
                     ),
                   ),
                 ],
@@ -710,7 +923,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
           if (!_isConnected && !_isConnecting)
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(

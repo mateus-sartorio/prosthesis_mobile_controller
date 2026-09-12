@@ -6,17 +6,20 @@ import 'action_command.dart';
 enum PowerCommand {
   powerOn('power_on'),
   powerOff('power_off'),
-  setGait('set_gait');
+  setGait('set_gait'),
+  setActuatorCurrent('set_actuator_current');
 
   final String wireValue;
   const PowerCommand(this.wireValue);
 
   /// The power state this command asks the prosthesis to reach, or `null` for
-  /// [setGait], which asks for a gait mode and leaves the power state alone.
+  /// [setGait] and [setActuatorCurrent], which ask for a gait mode and an
+  /// actuator current respectively and leave the power state alone.
   PowerState? get requestedState => switch (this) {
     PowerCommand.powerOn => PowerState.on,
     PowerCommand.powerOff => PowerState.off,
     PowerCommand.setGait => null,
+    PowerCommand.setActuatorCurrent => null,
   };
 
   static PowerCommand? fromWire(Object? value) {
@@ -75,10 +78,10 @@ enum ProsthesisState {
 /// A command feedback message published by the orchestrator on
 /// `prosthesis/actions/feedback/parsed`.
 ///
-/// Every command that reaches the prosthesis - power (`16` / `17`) and gait
-/// (`1`..`9`) alike - is answered with exactly one of these. Unknown fields
-/// are ignored so a future orchestrator version that forwards more data
-/// doesn't break parsing.
+/// Every command that reaches the prosthesis - power (`16` / `17`), gait
+/// (`1`..`9`) and actuator current alike - is answered with exactly one of
+/// these. Unknown fields are ignored so a future orchestrator version that
+/// forwards more data doesn't break parsing.
 class PowerFeedback {
   final DateTime timestamp;
   final PowerCommand command;

@@ -37,7 +37,9 @@ class GithubRelease {
       id: id is int ? id : int.tryParse('$id') ?? 0,
       tagName: (json['tag_name'] as String?) ?? '',
       name: json['name'] as String?,
-      publishedAt: rawDate is String ? DateTime.tryParse(rawDate)?.toLocal() : null,
+      publishedAt: rawDate is String
+          ? DateTime.tryParse(rawDate)?.toLocal()
+          : null,
       isPrerelease: json['prerelease'] == true,
       isDraft: json['draft'] == true,
     );
