@@ -15,7 +15,8 @@ class MqttConfig {
   static String? _password;
   static String _commandLogsTopic = 'prosthesis/actions';
   static String _parsedLogsTopic = 'prosthesis/logs/parsed';
-  static String _powerFeedbackParsedTopic = 'prosthesis/actions/feedback/parsed';
+  static String _powerFeedbackParsedTopic =
+      'prosthesis/actions/feedback/parsed';
   static int _qos = 1;
   static String _clientId = 'prosthesis-mobile-controller';
   static Duration _connectionTimeout = const Duration(seconds: 15);

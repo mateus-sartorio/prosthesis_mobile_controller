@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 /// Command type definitions
-enum CommandType { gaitMode, power }
+enum CommandType { gaitMode, power, actuatorCurrent }
 
 extension CommandTypeValue on CommandType {
   int get value {
@@ -10,6 +10,8 @@ extension CommandTypeValue on CommandType {
         return 1;
       case CommandType.power:
         return 2;
+      case CommandType.actuatorCurrent:
+        return 3;
     }
   }
 }
@@ -29,6 +31,35 @@ enum PowerState {
       case PowerState.off:
         return 'Off';
     }
+  }
+}
+
+/// The actuator current setpoint, in milliamps. Unlike the other commands the
+/// value is not an enum: it is the milliamp figure itself, sent as the
+/// `value` of a [CommandType.actuatorCurrent] command.
+abstract final class ActuatorCurrent {
+  /// Bounds the prosthesis accepts. Values outside them are rejected by the
+  /// bridge, so the UI never offers one and [clamp] is applied before sending.
+  static const int minMilliamps = 3000;
+  static const int maxMilliamps = 15000;
+
+  /// Step between selectable values, in milliamps. Keeps the slider on round
+  /// numbers instead of whatever pixel the finger landed on.
+  static const int stepMilliamps = 100;
+
+  /// The value assumed before the prosthesis has confirmed one. It cannot be
+  /// queried, so the app starts from the weakest setting rather than claiming
+  /// a current the actuator may not be running.
+  static const int assumedInitialMilliamps = minMilliamps;
+
+  /// Number of discrete positions between [minMilliamps] and [maxMilliamps].
+  static const int divisions = (maxMilliamps - minMilliamps) ~/ stepMilliamps;
+
+  /// [milliamps] rounded to the nearest [stepMilliamps] and held inside the
+  /// accepted range.
+  static int clamp(num milliamps) {
+    final stepped = (milliamps / stepMilliamps).round() * stepMilliamps;
+    return stepped.clamp(minMilliamps, maxMilliamps);
   }
 }
 

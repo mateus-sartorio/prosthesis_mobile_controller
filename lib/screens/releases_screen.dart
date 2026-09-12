@@ -225,7 +225,9 @@ class _ReleasesScreenState extends State<ReleasesScreen> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         decoration: BoxDecoration(
-          color: isSelected ? accent.withValues(alpha: 0.12) : const Color(0xFF1E293B),
+          color: isSelected
+              ? accent.withValues(alpha: 0.12)
+              : const Color(0xFF1E293B),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected ? accent : const Color(0xFF334155),
@@ -272,7 +274,10 @@ class _ReleasesScreenState extends State<ReleasesScreen> {
             if (isSelected)
               Container(
                 margin: const EdgeInsets.only(left: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: accent,
                   borderRadius: BorderRadius.circular(20),

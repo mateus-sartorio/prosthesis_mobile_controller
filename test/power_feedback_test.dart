@@ -120,6 +120,40 @@ void main() {
     expect(PowerCommand.powerOn.requestedState, PowerState.on);
     expect(PowerCommand.powerOff.requestedState, PowerState.off);
     expect(PowerCommand.setGait.requestedState, isNull);
+    expect(PowerCommand.setActuatorCurrent.requestedState, isNull);
+    expect(
+      PowerCommand.fromWire('set_actuator_current'),
+      PowerCommand.setActuatorCurrent,
+    );
+    // The spelling the orchestrator logged; a near miss is dropped as
+    // malformed, which is exactly the bug this guards against.
+    expect(PowerCommand.fromWire('set_current'), isNull);
+  });
+
+  test('ActuatorCurrent.clamp rounds to a step inside the accepted range', () {
+    expect(ActuatorCurrent.clamp(7480), 7500);
+    expect(ActuatorCurrent.clamp(7549.9), 7500);
+    expect(ActuatorCurrent.clamp(ActuatorCurrent.minMilliamps - 1), 3000);
+    expect(ActuatorCurrent.clamp(ActuatorCurrent.maxMilliamps + 1), 15000);
+    expect(ActuatorCurrent.clamp(0), 3000);
+    expect(ActuatorCurrent.clamp(1e9), 15000);
+  });
+
+  test('ActuatorCurrent divisions span the range in whole steps', () {
+    expect(
+      ActuatorCurrent.minMilliamps +
+          ActuatorCurrent.divisions * ActuatorCurrent.stepMilliamps,
+      ActuatorCurrent.maxMilliamps,
+    );
+  });
+
+  test('an actuator current command carries the milliamps as its value', () {
+    final command = CommandLog(
+      commandType: CommandType.actuatorCurrent.value,
+      value: 7500,
+    );
+    expect(command.toMap()['command_type'], 3);
+    expect(command.toMap()['value'], 7500);
   });
 
   test('GaitMode.fromValue maps wire values to modes', () {
