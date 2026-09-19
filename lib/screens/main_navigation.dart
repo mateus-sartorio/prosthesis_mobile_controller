@@ -4,9 +4,6 @@ import 'home_screen.dart';
 import 'releases_screen.dart';
 import 'sensors_screen.dart';
 
-/// Root navigation shell hosting the app's primary tabs in a bottom
-/// navigation bar. Tabs are kept alive via [IndexedStack] so their state
-/// (MQTT connection, loaded releases, scroll position) survives switching.
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
 
@@ -15,17 +12,12 @@ class MainNavigation extends StatefulWidget {
 }
 
 class _MainNavigationState extends State<MainNavigation> {
-  /// Temporarily hides the Versions tab (and [ReleasesScreen] with it) without
-  /// removing the feature. Flip back to `true` to bring the tab back.
   static const bool _showReleasesTab = false;
 
   int _currentIndex = 0;
 
   @override
   Widget build(BuildContext context) {
-    // Rebuilt each frame so [SensorsScreen] gets an up-to-date `isActive` flag
-    // (it gates its 10 Hz sampling on visibility). HomeScreen/ReleasesScreen
-    // are const, so they're canonicalized and keep their state across rebuilds.
     final screens = <Widget>[
       const HomeScreen(),
       SensorsScreen(isActive: _currentIndex == 1),
