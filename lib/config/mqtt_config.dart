@@ -22,7 +22,7 @@ class MqttConfig {
   static Duration _connectionTimeout = const Duration(seconds: 15);
   static Duration _reconnectInterval = const Duration(seconds: 5);
   static int _maxReconnectAttempts = 10;
-  static Duration _powerFeedbackTimeout = const Duration(seconds: 8);
+  static Duration _powerFeedbackTimeout = const Duration(seconds: 10);
 
   static String get environment => _environment;
   static String get host => _host;
