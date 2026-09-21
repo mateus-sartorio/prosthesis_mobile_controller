@@ -12,5 +12,5 @@
   "connectionTimeoutSeconds": 15,
   "reconnectIntervalSeconds": 5,
   "maxReconnectAttempts": 10,
-  "powerFeedbackTimeoutSeconds": 8
+  "powerFeedbackTimeoutSeconds": 10
 }
