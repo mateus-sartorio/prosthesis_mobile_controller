@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import 'home_screen.dart';
-import 'releases_screen.dart';
 import 'sensors_screen.dart';
 
 class MainNavigation extends StatefulWidget {
@@ -12,8 +11,6 @@ class MainNavigation extends StatefulWidget {
 }
 
 class _MainNavigationState extends State<MainNavigation> {
-  static const bool _showReleasesTab = false;
-
   int _currentIndex = 0;
 
   @override
@@ -21,7 +18,6 @@ class _MainNavigationState extends State<MainNavigation> {
     final screens = <Widget>[
       const HomeScreen(),
       SensorsScreen(isActive: _currentIndex == 1),
-      if (_showReleasesTab) const ReleasesScreen(),
     ];
 
     const items = <BottomNavigationBarItem>[
@@ -33,11 +29,6 @@ class _MainNavigationState extends State<MainNavigation> {
         icon: Icon(Icons.show_chart_rounded),
         label: 'Sensors',
       ),
-      if (_showReleasesTab)
-        BottomNavigationBarItem(
-          icon: Icon(Icons.system_update_rounded),
-          label: 'Versions',
-        ),
     ];
 
     return Scaffold(
