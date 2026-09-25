@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'action_command.dart';
 
-/// Which command a feedback message answers.
 enum PowerCommand {
   powerOn('power_on'),
   powerOff('power_off'),
@@ -12,9 +11,6 @@ enum PowerCommand {
   final String wireValue;
   const PowerCommand(this.wireValue);
 
-  /// The power state this command asks the prosthesis to reach, or `null` for
-  /// [setGait] and [setActuatorCurrent], which ask for a gait mode and an
-  /// actuator current respectively and leave the power state alone.
   PowerState? get requestedState => switch (this) {
     PowerCommand.powerOn => PowerState.on,
     PowerCommand.powerOff => PowerState.off,
@@ -35,7 +31,6 @@ enum PowerCommand {
       state == PowerState.on ? PowerCommand.powerOn : PowerCommand.powerOff;
 }
 
-/// Whether the prosthesis ended up in the state the command asked for.
 enum PowerFeedbackStatus {
   success('success'),
   failure('failure');
@@ -55,7 +50,6 @@ enum PowerFeedbackStatus {
   }
 }
 
-/// The prosthesis power state reported *after* a command was handled.
 enum ProsthesisState {
   on('on'),
   off('off');
@@ -75,28 +69,14 @@ enum ProsthesisState {
   }
 }
 
-/// A command feedback message published by the orchestrator on
-/// `prosthesis/actions/feedback/parsed`.
-///
-/// Every command that reaches the prosthesis - power (`16` / `17`), gait
-/// (`1`..`9`) and actuator current alike - is answered with exactly one of
-/// these. Unknown fields are ignored so a future orchestrator version that
-/// forwards more data doesn't break parsing.
 class PowerFeedback {
   final DateTime timestamp;
   final PowerCommand command;
   final PowerFeedbackStatus status;
   final ProsthesisState state;
 
-  /// The gait mode the prosthesis is in *after* the command was handled, as
-  /// the raw wire value. Every feedback carries it, power commands included:
-  /// the bridge always holds a gait mode, defaulting to `1` until a gait
-  /// command changes it. Kept raw because the wire type is a `u8` and could
-  /// name a mode this app version predates; use [gaitMode] for the enum.
   final int gait;
 
-  /// Human-readable detail from the bridge. Free text and **not** a stable
-  /// API: show it and log it, never branch on it.
   final String message;
 
   const PowerFeedback({
@@ -110,15 +90,8 @@ class PowerFeedback {
 
   bool get isSuccess => status.isSuccess;
 
-  /// [gait] as a known [GaitMode], or `null` when the reported value is not
-  /// one this app knows (a bridge newer than the app). The orchestrator drops
-  /// feedback whose gait it cannot resolve, so this is not expected in
-  /// practice - it just must not crash the parse.
   GaitMode? get gaitMode => GaitMode.fromValue(gait);
 
-  /// Parses a raw payload, returning `null` when it is malformed (missing
-  /// required field, unknown enum value or invalid JSON). Callers should log
-  /// and ignore a `null` rather than crash the MQTT callback.
   static PowerFeedback? tryParse(String payload) {
     Object? decoded;
     try {
