@@ -18,8 +18,8 @@ extension CommandTypeValue on CommandType {
 
 /// Power states (turn the prosthesis on or off)
 enum PowerState {
-  on(16),
-  off(17);
+  on(1),
+  off(2);
 
   final int value;
   const PowerState(this.value);
@@ -113,10 +113,13 @@ enum GaitMode {
   }
 }
 
+/// A command as it goes over the wire. Every command has the same shape -
+/// `timestamp`, `command_type` and `value` - and is identified by its
+/// [commandType] alone; [value] only means something within that type.
 class CommandLog {
   final String? id;
   final DateTime timestamp;
-  final int commandType;
+  final CommandType commandType;
   final int value;
 
   CommandLog({
@@ -129,7 +132,7 @@ class CommandLog {
   factory CommandLog.fromGaitMode(GaitMode mode, {String? id}) {
     return CommandLog(
       id: id,
-      commandType: CommandType.gaitMode.value,
+      commandType: CommandType.gaitMode,
       value: mode.value,
     );
   }
@@ -137,14 +140,22 @@ class CommandLog {
   factory CommandLog.fromPower(PowerState state, {String? id}) {
     return CommandLog(
       id: id,
-      commandType: CommandType.power.value,
+      commandType: CommandType.power,
       value: state.value,
+    );
+  }
+
+  factory CommandLog.fromActuatorCurrent(int milliamps, {String? id}) {
+    return CommandLog(
+      id: id,
+      commandType: CommandType.actuatorCurrent,
+      value: milliamps,
     );
   }
 
   Map<String, dynamic> toMap() => {
     'timestamp': timestamp.toIso8601String(),
-    'command_type': commandType,
+    'command_type': commandType.value,
     'value': value,
   };
 
@@ -152,5 +163,5 @@ class CommandLog {
 
   @override
   String toString() =>
-      'CommandLog(id: $id, timestamp: $timestamp, commandType: $commandType, value: $value)';
+      'CommandLog(id: $id, timestamp: $timestamp, commandType: ${commandType.value}, value: $value)';
 }

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -9,9 +10,11 @@ import '../models/sensor_metadata.dart';
 import '../services/mqtt_service.dart';
 
 /// Live plot of the prosthesis' sensors, fed from the parsed-logs MQTT topic
-/// ([MqttConfig.parsedLogsTopic]). Each JSON key in the incoming payload becomes
-/// one sensor channel; every payload carries a batch of samples that are
-/// appended to a per-sensor sliding window so memory stays bounded.
+/// ([MqttConfig.parsedLogsTopic]). Every payload carries a batch of samples;
+/// each JSON key of a sample becomes one sensor channel, except the
+/// prosthesis' clock ([SensorMetadata.timeKey]), which places the sample on
+/// the time axis every chart shares. Samples are kept in a sliding window so
+/// memory stays bounded.
 ///
 /// Two payload shapes are accepted (see [_parseSamples]):
 ///   * an object `{"value": [ {..}, {..} ]}`, or
@@ -63,28 +66,20 @@ class _SensorsScreenState extends State<SensorsScreen>
   StreamSubscription<String>? _logsSub;
   StreamSubscription<bool>? _statusSub;
 
-  /// Sensor keys in stable discovery order (captured from the first payload).
+  /// Channels to plot, in stable discovery order (captured from the first
+  /// sample of a run). The time key is not one of them.
   List<String> _sensorKeys = [];
 
-  /// Sliding window of samples per sensor. The x coordinate is a monotonically
-  /// increasing sample index so the plot scrolls left as new data arrives.
+  /// Sliding window of samples per channel. The x coordinate is the
+  /// prosthesis' clock, the same for every channel, so the charts line up.
   final Map<String, List<FlSpot>> _series = {};
 
-  /// Latest value per sensor (mirrors the last spot's y; kept for the readout).
+  /// Latest value per channel (mirrors the last spot's y; kept for the readout).
   final Map<String, double> _current = {};
 
-  /// Global sample counter, used as the x coordinate for every series.
-  int _sampleIndex = 0;
-
-  /// Wall-clock arrival time (epoch seconds) of each retained sample, kept in
-  /// lockstep with the sliding window so an x coordinate can be mapped back to
-  /// a time for the axis labels. `_sampleTimes[0]` is the sample at global
-  /// index [_windowStart]. Samples in the same payload share one timestamp,
-  /// which is plenty for the coarse "seconds ago" ticks we draw.
-  final List<double> _sampleTimes = [];
-
-  /// Global sample index of `_sampleTimes[0]` (advances as the window trims).
-  int _windowStart = 0;
+  /// Prosthesis time of each retained sample, oldest first. It bounds the
+  /// window every chart spans, from its first entry to its last.
+  final List<double> _times = [];
 
   /// Set when new samples have been buffered since the last UI flush.
   bool _dirty = false;
@@ -175,41 +170,60 @@ class _SensorsScreenState extends State<SensorsScreen>
   }
 
   void _ingest(List<Map<String, dynamic>> samples) {
-    // Establish the sensor set (and its order) from the first batch seen.
-    if (_sensorKeys.isEmpty) {
-      _sensorKeys = samples.first.keys.toList();
-      for (final key in _sensorKeys) {
-        _series[key] = <FlSpot>[];
-      }
-    }
-
-    final now = DateTime.now().millisecondsSinceEpoch / 1000.0;
     for (final sample in samples) {
-      final x = _sampleIndex.toDouble();
+      // Without its time a sample has no place on the shared axis.
+      final t = _asDouble(sample[SensorMetadata.timeKey]);
+      if (t == null) continue;
+
+      // The clock starts over from zero whenever the control program is
+      // restarted (power on, gait or current change), so a step back in time
+      // is a new run, whose samples don't belong on the old run's axis.
+      if (_times.isNotEmpty && t < _times.last) {
+        _clear();
+      }
+
+      // Establish the channel set (and its order) from the run's first sample.
+      if (_sensorKeys.isEmpty) {
+        _sensorKeys = sample.keys
+            .where((key) => key != SensorMetadata.timeKey)
+            .toList();
+        for (final key in _sensorKeys) {
+          _series[key] = <FlSpot>[];
+        }
+      }
+
       for (final key in _sensorKeys) {
         final value = _asDouble(sample[key]);
         if (value == null) continue;
         _current[key] = value;
-        _series[key]!.add(FlSpot(x, value));
+        _series[key]!.add(FlSpot(t, value));
       }
-      _sampleTimes.add(now);
-      _sampleIndex++;
+      _times.add(t);
     }
 
-    // Trim each window once per batch (cheaper than removing per sample).
-    for (final key in _sensorKeys) {
-      final buffer = _series[key]!;
-      if (buffer.length > _windowSize) {
-        buffer.removeRange(0, buffer.length - _windowSize);
-      }
+    // Trim the window once per batch (cheaper than removing per sample), then
+    // drop from every channel what it holds from before the window.
+    if (_times.length > _windowSize) {
+      _times.removeRange(0, _times.length - _windowSize);
     }
-    if (_sampleTimes.length > _windowSize) {
-      final excess = _sampleTimes.length - _windowSize;
-      _sampleTimes.removeRange(0, excess);
-      _windowStart += excess;
+    if (_times.isNotEmpty) {
+      final start = _times.first;
+      for (final spots in _series.values) {
+        final keep = spots.indexWhere((spot) => spot.x >= start);
+        spots.removeRange(0, keep == -1 ? spots.length : keep);
+      }
     }
 
     _dirty = true;
+  }
+
+  /// Forgets the current run, channel set included, so the next sample starts
+  /// a fresh one.
+  void _clear() {
+    _sensorKeys = [];
+    _series.clear();
+    _current.clear();
+    _times.clear();
   }
 
   double? _asDouble(dynamic value) {
@@ -361,7 +375,7 @@ class _SensorsScreenState extends State<SensorsScreen>
               ),
               const SizedBox(width: 8),
               Text(
-                value == null ? '--' : value.toStringAsFixed(2),
+                value == null ? '--' : meta.format(value),
                 style: TextStyle(
                   color: color,
                   fontSize: 16,
@@ -399,9 +413,11 @@ class _SensorsScreenState extends State<SensorsScreen>
     final key = _sensorKeys[index];
     final color = _colorFor(index);
     final spots = _series[key]!;
+    final sensor = SensorMetadata.forKey(key);
 
-    // Until at least two samples exist there's nothing to draw a line between.
-    if (spots.length < 2) {
+    // Until two samples exist, at two different times, there's nothing to draw
+    // a line between.
+    if (spots.length < 2 || _times.length < 2 || _times.last <= _times.first) {
       return const Center(
         child: Text(
           'Waiting for data…',
@@ -415,26 +431,30 @@ class _SensorsScreenState extends State<SensorsScreen>
     final (minY, maxY) = _yRange(spots);
     final span = maxY - minY;
 
-    // A handful of ticks across the window — enough to give a sense of elapsed
-    // time without crowding the axis.
-    final tickInterval = (spots.last.x - spots.first.x) / 4;
+    // Every chart spans the same window of the prosthesis' clock, so a given
+    // moment sits at the same horizontal position on all of them.
+    final minX = _times.first;
+    final maxX = _times.last;
+    final timeInterval = _niceInterval(maxX - minX);
 
     return LineChart(
       // Disable the implicit data-change animation: with new data every ~100 ms
       // it would never settle and would look like jitter.
       duration: Duration.zero,
       LineChartData(
-        minX: spots.first.x,
-        maxX: spots.last.x,
+        minX: minX,
+        maxX: maxX,
         minY: minY,
         maxY: maxY,
         clipData: const FlClipData.all(),
         lineTouchData: const LineTouchData(enabled: false),
         gridData: FlGridData(
           show: true,
-          drawVerticalLine: false,
+          verticalInterval: timeInterval,
           horizontalInterval: span / 4,
           getDrawingHorizontalLine: (_) =>
+              const FlLine(color: Color(0xFF334155), strokeWidth: 1),
+          getDrawingVerticalLine: (_) =>
               const FlLine(color: Color(0xFF334155), strokeWidth: 1),
         ),
         borderData: FlBorderData(show: false),
@@ -449,20 +469,17 @@ class _SensorsScreenState extends State<SensorsScreen>
             sideTitles: SideTitles(
               showTitles: true,
               reservedSize: 20,
-              interval: tickInterval,
+              interval: timeInterval,
               getTitlesWidget: (value, meta) {
-                final label = _formatTimeLabel(value);
-                if (label == null) return const SizedBox.shrink();
-                // Bursty data can map several evenly-spaced ticks onto nearly
-                // the same time; skip a tick whose label repeats the one to its
-                // left so labels don't render on top of each other.
-                if (_formatTimeLabel(value - tickInterval) == label) {
+                // fl_chart also labels the window's edges, which rarely fall
+                // on a round time and would crowd the neighbouring tick.
+                if (value == meta.min || value == meta.max) {
                   return const SizedBox.shrink();
                 }
                 return Padding(
                   padding: const EdgeInsets.only(top: 6),
                   child: Text(
-                    label,
+                    _formatTime(value, timeInterval),
                     style: const TextStyle(
                       color: Color(0xFF64748B),
                       fontSize: 10,
@@ -497,6 +514,11 @@ class _SensorsScreenState extends State<SensorsScreen>
           LineChartBarData(
             spots: spots,
             isCurved: false,
+            // A state holds until the next sample changes it.
+            isStepLineChart: sensor.discrete,
+            lineChartStepData: const LineChartStepData(
+              stepDirection: LineChartStepData.stepDirectionForward,
+            ),
             color: color,
             barWidth: 2,
             dotData: const FlDotData(show: false),
@@ -528,43 +550,34 @@ class _SensorsScreenState extends State<SensorsScreen>
     return (minY - pad, maxY + pad);
   }
 
-  /// Relative-time label for a bottom-axis tick: the arrival time of the
-  /// sample at [x] expressed as how long ago it was, e.g. `-30s`, `-5m`,
-  /// `-1h20m`, or `now`. Returns null when the tick falls outside the
-  /// timestamped window so no label is drawn.
-  String? _formatTimeLabel(double x) {
-    if (_sampleTimes.isEmpty) return null;
-    final i = x.round() - _windowStart;
-    if (i < 0 || i >= _sampleTimes.length) return null;
-    final secondsAgo = _sampleTimes.last - _sampleTimes[i];
-    if (secondsAgo < 0.5) return 'now';
-    final windowSpan = _sampleTimes.last - _sampleTimes.first;
-    final age = _formatAge(secondsAgo, windowSpan);
-    return age == null ? null : '-$age';
+  /// A round step for the time axis giving about four ticks across [span]
+  /// seconds: 1, 2 or 5 times a power of ten. Round steps keep the ticks on
+  /// round times, so they scroll with the data instead of jumping around.
+  double _niceInterval(double span) {
+    final raw = span / 4;
+    final magnitude = math
+        .pow(10, (math.log(raw) / math.ln10).floor())
+        .toDouble();
+    final normalized = raw / magnitude;
+    final step = normalized < 1.5
+        ? 1.0
+        : normalized < 3
+        ? 2.0
+        : normalized < 7
+        ? 5.0
+        : 10.0;
+    return step * magnitude;
   }
 
-  /// Formats an age (seconds ago) into a compact, human-readable string. The
-  /// unit is chosen from the overall window span so every tick on the axis
-  /// reads in the same unit: seconds for sub-minute windows, whole minutes up
-  /// to an hour, then hours (with minutes) beyond that.
-  ///
-  /// Returns null when the age rounds to zero in the chosen unit, so a tick
-  /// that's essentially "now" isn't labelled `-0m` right on top of the `now`
-  /// tick at the right edge.
-  String? _formatAge(double secondsAgo, double windowSpan) {
-    if (windowSpan < 60) {
-      final seconds = secondsAgo.round();
-      return seconds == 0 ? null : '${seconds}s';
-    }
-    if (windowSpan < 3600) {
-      final minutes = (secondsAgo / 60).round();
-      return minutes == 0 ? null : '${minutes}m';
-    }
-    final totalMinutes = (secondsAgo / 60).round();
-    if (totalMinutes == 0) return null;
-    final hours = totalMinutes ~/ 60;
-    final minutes = totalMinutes % 60;
-    return minutes == 0 ? '${hours}h' : '${hours}h${minutes}m';
+  /// Bottom-axis label: the prosthesis' time in seconds, with as many decimals
+  /// as the tick [interval] needs to tell neighbouring ticks apart.
+  String _formatTime(double seconds, double interval) {
+    final decimals = interval >= 1
+        ? 0
+        : interval >= 0.1
+        ? 1
+        : 2;
+    return '${seconds.toStringAsFixed(decimals)}s';
   }
 
   /// Axis labels: drop the decimals once values get large enough that they'd

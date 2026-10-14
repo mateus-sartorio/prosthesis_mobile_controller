@@ -404,10 +404,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
-      await _mqttService.publishAction(
-        powerState.value,
-        type: CommandType.power,
-      );
+      await _mqttService.publishAction(CommandLog.fromPower(powerState));
       _feedbackTimer?.cancel();
       _feedbackTimer = Timer(
         MqttConfig.powerFeedbackTimeout,
@@ -431,7 +428,7 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _pendingMode = mode);
 
     try {
-      await _mqttService.publishAction(mode.value);
+      await _mqttService.publishAction(CommandLog.fromGaitMode(mode));
       _gaitFeedbackTimer?.cancel();
       _gaitFeedbackTimer = Timer(
         MqttConfig.powerFeedbackTimeout,
@@ -469,8 +466,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     try {
       await _mqttService.publishAction(
-        target,
-        type: CommandType.actuatorCurrent,
+        CommandLog.fromActuatorCurrent(target),
       );
       _currentFeedbackTimer?.cancel();
       _currentFeedbackTimer = Timer(
