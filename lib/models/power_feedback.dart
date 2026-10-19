@@ -69,26 +69,59 @@ enum ProsthesisState {
   }
 }
 
+/// Who asked for what a feedback reports.
+enum FeedbackOrigin {
+  /// The answer to a command sent from the app.
+  remote('remote'),
+
+  /// The prosthesis acted on its own, e.g. a stop requested on the Raspberry Pi.
+  internal('internal');
+
+  final String wireValue;
+  const FeedbackOrigin(this.wireValue);
+
+  static FeedbackOrigin? fromWire(Object? value) {
+    for (final origin in FeedbackOrigin.values) {
+      if (origin.wireValue == value) {
+        return origin;
+      }
+    }
+    return null;
+  }
+}
+
 class PowerFeedback {
   final DateTime timestamp;
+
+  /// Id the server stored the command under; null for [FeedbackOrigin.internal].
+  final int? commandId;
+  final FeedbackOrigin origin;
   final PowerCommand command;
   final PowerFeedbackStatus status;
   final ProsthesisState state;
 
-  final int gait;
+  /// The gait mode and actuator current (mA) the prosthesis runs with. Only
+  /// reported while it is on: null when [state] is off.
+  final int? gait;
+  final int? current;
 
   final String message;
 
   const PowerFeedback({
     required this.timestamp,
+    required this.commandId,
+    required this.origin,
     required this.command,
     required this.status,
     required this.state,
     required this.gait,
+    required this.current,
     required this.message,
   });
 
   bool get isSuccess => status.isSuccess;
+
+  bool get isInternal => origin == FeedbackOrigin.internal;
 
   GaitMode? get gaitMode => GaitMode.fromValue(gait);
 
@@ -110,31 +143,44 @@ class PowerFeedback {
     final command = PowerCommand.fromWire(decoded['command']);
     final status = PowerFeedbackStatus.fromWire(decoded['status']);
     final state = ProsthesisState.fromWire(decoded['state']);
+    // Servers older than the origin field only ever relayed command answers.
+    final origin = decoded.containsKey('origin')
+        ? FeedbackOrigin.fromWire(decoded['origin'])
+        : FeedbackOrigin.remote;
+    final commandId = decoded['command_id'];
     final gait = decoded['gait'];
+    final current = decoded['current'];
     final message = decoded['message'];
 
     if (timestamp == null ||
         command == null ||
         status == null ||
         state == null ||
-        gait is! int ||
+        origin == null ||
+        (commandId != null && commandId is! int) ||
+        (gait != null && gait is! int) ||
+        (current != null && current is! int) ||
         message is! String) {
       return null;
     }
 
     return PowerFeedback(
       timestamp: timestamp.toUtc(),
+      commandId: commandId as int?,
+      origin: origin,
       command: command,
       status: status,
       state: state,
-      gait: gait,
+      gait: gait as int?,
+      current: current as int?,
       message: message,
     );
   }
 
   @override
   String toString() =>
-      'PowerFeedback(timestamp: $timestamp, command: ${command.wireValue}, '
+      'PowerFeedback(timestamp: $timestamp, commandId: $commandId, '
+      'origin: ${origin.wireValue}, command: ${command.wireValue}, '
       'status: ${status.wireValue}, state: ${state.wireValue}, '
-      'gait: $gait, message: $message)';
+      'gait: $gait, current: $current, message: $message)';
 }

@@ -54,7 +54,8 @@ class _HomeScreenState extends State<HomeScreen> {
   int _sliderMilliamps = ActuatorCurrent.assumedInitialMilliamps;
 
   /// True while any command is waiting for its feedback. Only one is ever in
-  /// flight: feedback carries no correlation id, so matching relies on that.
+  /// flight: the feedback's command id is assigned by the server, which the
+  /// app never learns, so matching relies on that.
   bool get _isCommandPending =>
       _pendingCommand != null ||
       _pendingMode != null ||
@@ -176,6 +177,10 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted) {
       return;
     }
+    if (feedback.isInternal) {
+      _onInternalFeedback(feedback);
+      return;
+    }
     switch (feedback.command) {
       case PowerCommand.setGait:
         _onGaitFeedback(feedback);
@@ -197,6 +202,32 @@ class _HomeScreenState extends State<HomeScreen> {
     _activeMode = feedback.isSuccess && feedback.state.isOn
         ? feedback.gaitMode
         : null;
+    // The current the prosthesis reports running with replaces the assumed
+    // one, unless the user is waiting on a setpoint of their own.
+    final reportedCurrent = feedback.current;
+    if (feedback.isSuccess && feedback.state.isOn && reportedCurrent != null) {
+      _currentMilliamps = reportedCurrent;
+      if (_pendingMilliamps == null) {
+        _sliderMilliamps = reportedCurrent;
+      }
+    }
+  }
+
+  /// Applies something the prosthesis did on its own (a stop requested on the
+  /// Raspberry Pi). It answers no command of ours, so whatever is pending keeps
+  /// waiting for its own feedback.
+  void _onInternalFeedback(PowerFeedback feedback) {
+    setState(() {
+      _applyFeedback(feedback);
+    });
+
+    _showSnackBar(
+      feedback.isSuccess
+          ? 'Stopped on the prosthesis: ${feedback.message}'
+          : 'Stop on the prosthesis failed: ${feedback.message}',
+      feedback.isSuccess ? const Color(0xFFF59E0B) : const Color(0xFFEF4444),
+      duration: const Duration(seconds: 6),
+    );
   }
 
   void _onPowerCommandFeedback(PowerFeedback feedback) {
@@ -227,12 +258,14 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// Applies the answer to a gait command. The bridge reports the gait it
-  /// holds even when the restart failed, so a feedback for the mode we asked
-  /// for is ours whether it succeeded or not.
+  /// Applies the answer to a gait command. A feedback for the mode we asked
+  /// for is ours whether it succeeded or not; one without a gait (the restart
+  /// failed and left the prosthesis off) answers the pending command too.
   void _onGaitFeedback(PowerFeedback feedback) {
     final pending = _pendingMode;
-    if (pending != null && feedback.gaitMode != pending) {
+    if (pending != null &&
+        feedback.gait != null &&
+        feedback.gaitMode != pending) {
       // Not the answer we are waiting for (stale, or another controller's
       // command). Keep waiting for ours rather than settling on this one.
       debugPrint('Ignoring unmatched gait feedback: $feedback');
@@ -261,9 +294,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// Applies the answer to an actuator-current command. Feedback carries no
-  /// current value, so what gets confirmed is the setpoint we asked for - and
-  /// only when the command succeeded: a failure leaves the prosthesis on the
+  /// Applies the answer to an actuator-current command. A success confirms the
+  /// setpoint we asked for (or, when the feedback reports one, the current the
+  /// prosthesis actually runs with); a failure leaves the prosthesis on the
   /// current it already had, so the slider goes back to that.
   void _onCurrentFeedback(PowerFeedback feedback) {
     final pending = _pendingMilliamps;
