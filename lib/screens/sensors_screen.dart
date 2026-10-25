@@ -9,8 +9,8 @@ import '../config/mqtt_config.dart';
 import '../models/sensor_metadata.dart';
 import '../services/mqtt_service.dart';
 
-/// Live plot of the prosthesis' sensors, fed from the parsed-logs MQTT topic
-/// ([MqttConfig.parsedLogsTopic]). Every payload carries a batch of samples;
+/// Live plot of the prosthesis' sensors, fed from the validated-logs MQTT topic
+/// ([MqttConfig.validatedLogsTopic]). Every payload carries a batch of samples;
 /// each JSON key of a sample becomes one sensor channel, except the
 /// prosthesis' clock ([SensorMetadata.timeKey]), which places the sample on
 /// the time axis every chart shares. Samples are kept in a sliding window so
@@ -96,11 +96,11 @@ class _SensorsScreenState extends State<SensorsScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _mqttService = MqttService(subscribeToParsedLogs: true);
+    _mqttService = MqttService(subscribeToValidatedLogs: true);
     _statusSub = _mqttService.connectionStatusStream.listen((connected) {
       if (mounted) setState(() => _isConnected = connected);
     });
-    _logsSub = _mqttService.parsedLogsStream.listen(_onPayload);
+    _logsSub = _mqttService.validatedLogsStream.listen(_onPayload);
     _syncRendering();
     _connect();
   }
@@ -316,7 +316,7 @@ class _SensorsScreenState extends State<SensorsScreen>
           ),
           const Spacer(),
           Text(
-            MqttConfig.parsedLogsTopic,
+            MqttConfig.validatedLogsTopic,
             style: const TextStyle(
               fontFamily: 'monospace',
               fontSize: 11,

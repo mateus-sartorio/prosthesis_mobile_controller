@@ -14,9 +14,9 @@ class MqttConfig {
   static String? _username;
   static String? _password;
   static String _commandLogsTopic = 'prosthesis/actions';
-  static String _parsedLogsTopic = 'prosthesis/logs/parsed';
-  static String _powerFeedbackParsedTopic =
-      'prosthesis/actions/feedback/parsed';
+  static String _validatedLogsTopic = 'prosthesis/logs/validated';
+  static String _powerFeedbackValidatedTopic =
+      'prosthesis/actions/feedback/validated';
   static int _qos = 1;
   static String _clientId = 'prosthesis-mobile-controller';
   static Duration _connectionTimeout = const Duration(seconds: 15);
@@ -31,8 +31,8 @@ class MqttConfig {
   static String? get username => _username;
   static String? get password => _password;
   static String get commandLogsTopic => _commandLogsTopic;
-  static String get parsedLogsTopic => _parsedLogsTopic;
-  static String get powerFeedbackParsedTopic => _powerFeedbackParsedTopic;
+  static String get validatedLogsTopic => _validatedLogsTopic;
+  static String get powerFeedbackValidatedTopic => _powerFeedbackValidatedTopic;
   static int get qos => _qos;
   static String get clientId => _clientId;
   static Duration get connectionTimeout => _connectionTimeout;
@@ -76,15 +76,15 @@ class MqttConfig {
       'commandLogsTopic',
       fallback: _commandLogsTopic,
     );
-    _parsedLogsTopic = readString(
+    _validatedLogsTopic = readString(
       decoded,
-      'parsedLogsTopic',
-      fallback: _parsedLogsTopic,
+      'validatedLogsTopic',
+      fallback: _validatedLogsTopic,
     );
-    _powerFeedbackParsedTopic = readString(
+    _powerFeedbackValidatedTopic = readString(
       decoded,
-      'powerFeedbackParsedTopic',
-      fallback: _powerFeedbackParsedTopic,
+      'powerFeedbackValidatedTopic',
+      fallback: _powerFeedbackValidatedTopic,
     );
     _qos = readInt(decoded, 'qos', fallback: _qos);
     _clientId = readString(decoded, 'clientId', fallback: _clientId);

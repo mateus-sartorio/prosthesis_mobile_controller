@@ -9,15 +9,15 @@ import '../models/power_feedback.dart';
 /// Service for managing MQTT connection and publishing messages
 class MqttService {
   MqttService({
-    bool subscribeToParsedLogs = false,
+    bool subscribeToValidatedLogs = false,
     bool subscribeToPowerFeedback = false,
-  }) : _subscribeToParsedLogs = subscribeToParsedLogs,
+  }) : _subscribeToValidatedLogs = subscribeToValidatedLogs,
        _subscribeToPowerFeedback = subscribeToPowerFeedback;
 
-  /// Whether this client should subscribe to the parsed-logs topic and emit
-  /// the payloads on [parsedLogsStream]. Off by default so a publish-only
+  /// Whether this client should subscribe to the validated-logs topic and emit
+  /// the payloads on [validatedLogsStream]. Off by default so a publish-only
   /// client (e.g. the control screen) doesn't open a needless subscription.
-  final bool _subscribeToParsedLogs;
+  final bool _subscribeToValidatedLogs;
 
   /// Whether this client should subscribe to the power-feedback topic and emit
   /// the parsed messages on [powerFeedbackStream].
@@ -25,7 +25,7 @@ class MqttService {
 
   MqttServerClient? _client;
   final _connectionStatusController = StreamController<bool>.broadcast();
-  final _parsedLogsController = StreamController<String>.broadcast();
+  final _validatedLogsController = StreamController<String>.broadcast();
   final _powerFeedbackController = StreamController<PowerFeedback>.broadcast();
   StreamSubscription<List<MqttReceivedMessage<MqttMessage>>>? _updatesSub;
   final String _runtimeClientId =
@@ -40,9 +40,9 @@ class MqttService {
   /// Stream of connection status changes
   Stream<bool> get connectionStatusStream => _connectionStatusController.stream;
 
-  /// Stream of raw payloads received on the parsed-logs topic. Only emits when
-  /// the client was created with `subscribeToParsedLogs: true`.
-  Stream<String> get parsedLogsStream => _parsedLogsController.stream;
+  /// Stream of raw payloads received on the validated-logs topic. Only emits
+  /// when the client was created with `subscribeToValidatedLogs: true`.
+  Stream<String> get validatedLogsStream => _validatedLogsController.stream;
 
   /// Stream of power command feedback published by the orchestrator. Only
   /// emits when the client was created with `subscribeToPowerFeedback: true`.
@@ -163,16 +163,16 @@ class MqttService {
   void _subscribeTopics() {
     final client = _client;
     if (client == null ||
-        (!_subscribeToParsedLogs && !_subscribeToPowerFeedback)) {
+        (!_subscribeToValidatedLogs && !_subscribeToPowerFeedback)) {
       return;
     }
 
-    if (_subscribeToParsedLogs) {
-      client.subscribe(MqttConfig.parsedLogsTopic, MqttQos.atLeastOnce);
+    if (_subscribeToValidatedLogs) {
+      client.subscribe(MqttConfig.validatedLogsTopic, MqttQos.atLeastOnce);
     }
     if (_subscribeToPowerFeedback) {
       client.subscribe(
-        MqttConfig.powerFeedbackParsedTopic,
+        MqttConfig.powerFeedbackValidatedTopic,
         MqttQos.atLeastOnce,
       );
     }
@@ -188,8 +188,8 @@ class MqttService {
   void _onMessages(List<MqttReceivedMessage<MqttMessage>> messages) {
     for (final received in messages) {
       final topic = received.topic;
-      if (topic != MqttConfig.parsedLogsTopic &&
-          topic != MqttConfig.powerFeedbackParsedTopic) {
+      if (topic != MqttConfig.validatedLogsTopic &&
+          topic != MqttConfig.powerFeedbackValidatedTopic) {
         continue;
       }
       final publishMessage = received.payload as MqttPublishMessage;
@@ -197,9 +197,9 @@ class MqttService {
         publishMessage.payload.message,
       );
 
-      if (topic == MqttConfig.parsedLogsTopic) {
-        if (!_parsedLogsController.isClosed) {
-          _parsedLogsController.add(payload);
+      if (topic == MqttConfig.validatedLogsTopic) {
+        if (!_validatedLogsController.isClosed) {
+          _validatedLogsController.add(payload);
         }
         continue;
       }
@@ -272,7 +272,7 @@ class MqttService {
     _client?.disconnect();
 
     _connectionStatusController.close();
-    _parsedLogsController.close();
+    _validatedLogsController.close();
     _powerFeedbackController.close();
     _isConnected = false;
   }
