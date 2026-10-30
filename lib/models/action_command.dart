@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-/// Command type definitions
 enum CommandType { gaitMode, power, actuatorCurrent }
 
 extension CommandTypeValue on CommandType {
@@ -16,7 +15,6 @@ extension CommandTypeValue on CommandType {
   }
 }
 
-/// Power states (turn the prosthesis on or off)
 enum PowerState {
   on(1),
   off(2);
@@ -34,36 +32,22 @@ enum PowerState {
   }
 }
 
-/// The actuator current setpoint, in milliamps. Unlike the other commands the
-/// value is not an enum: it is the milliamp figure itself, sent as the
-/// `value` of a [CommandType.actuatorCurrent] command.
 abstract final class ActuatorCurrent {
-  /// Bounds the prosthesis accepts. Values outside them are rejected by the
-  /// bridge, so the UI never offers one and [clamp] is applied before sending.
   static const int minMilliamps = 3000;
   static const int maxMilliamps = 15000;
 
-  /// Step between selectable values, in milliamps. Keeps the slider on round
-  /// numbers instead of whatever pixel the finger landed on.
   static const int stepMilliamps = 100;
 
-  /// The value assumed before the prosthesis has confirmed one. It cannot be
-  /// queried, so the app starts from the weakest setting rather than claiming
-  /// a current the actuator may not be running.
   static const int assumedInitialMilliamps = minMilliamps;
 
-  /// Number of discrete positions between [minMilliamps] and [maxMilliamps].
   static const int divisions = (maxMilliamps - minMilliamps) ~/ stepMilliamps;
 
-  /// [milliamps] rounded to the nearest [stepMilliamps] and held inside the
-  /// accepted range.
   static int clamp(num milliamps) {
     final stepped = (milliamps / stepMilliamps).round() * stepMilliamps;
     return stepped.clamp(minMilliamps, maxMilliamps);
   }
 }
 
-/// Gait modes
 enum GaitMode {
   walking(1),
   stairAscent(2),
@@ -101,8 +85,6 @@ enum GaitMode {
     }
   }
 
-  /// The gait mode with this wire value, or `null` when the value is not one
-  /// the app knows about (a prosthesis newer than this app).
   static GaitMode? fromValue(Object? value) {
     for (final mode in GaitMode.values) {
       if (mode.value == value) {
@@ -113,44 +95,25 @@ enum GaitMode {
   }
 }
 
-/// A command as it goes over the wire. Every command has the same shape -
-/// `timestamp`, `command_type` and `value` - and is identified by its
-/// [commandType] alone; [value] only means something within that type.
 class CommandLog {
   final String? id;
   final DateTime timestamp;
   final CommandType commandType;
   final int value;
 
-  CommandLog({
-    this.id,
-    DateTime? timestamp,
-    required this.commandType,
-    required this.value,
-  }) : timestamp = (timestamp ?? DateTime.now()).toUtc();
+  CommandLog({this.id, DateTime? timestamp, required this.commandType, required this.value})
+    : timestamp = (timestamp ?? DateTime.now()).toUtc();
 
   factory CommandLog.fromGaitMode(GaitMode mode, {String? id}) {
-    return CommandLog(
-      id: id,
-      commandType: CommandType.gaitMode,
-      value: mode.value,
-    );
+    return CommandLog(id: id, commandType: CommandType.gaitMode, value: mode.value);
   }
 
   factory CommandLog.fromPower(PowerState state, {String? id}) {
-    return CommandLog(
-      id: id,
-      commandType: CommandType.power,
-      value: state.value,
-    );
+    return CommandLog(id: id, commandType: CommandType.power, value: state.value);
   }
 
   factory CommandLog.fromActuatorCurrent(int milliamps, {String? id}) {
-    return CommandLog(
-      id: id,
-      commandType: CommandType.actuatorCurrent,
-      value: milliamps,
-    );
+    return CommandLog(id: id, commandType: CommandType.actuatorCurrent, value: milliamps);
   }
 
   Map<String, dynamic> toMap() => {
@@ -162,6 +125,5 @@ class CommandLog {
   String toJson() => jsonEncode(toMap());
 
   @override
-  String toString() =>
-      'CommandLog(id: $id, timestamp: $timestamp, commandType: ${commandType.value}, value: $value)';
+  String toString() => 'CommandLog(id: $id, timestamp: $timestamp, commandType: ${commandType.value}, value: $value)';
 }

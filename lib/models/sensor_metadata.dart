@@ -2,15 +2,10 @@ class SensorMetadata {
   final String label;
   final String? unit;
 
-  /// Whether the channel holds a discrete value (a state) rather than a
-  /// continuous measurement: it is drawn in steps and read out without
-  /// trailing zeros.
   final bool discrete;
 
   const SensorMetadata(this.label, {this.unit, this.discrete = false});
 
-  /// Key of the prosthesis' clock, in seconds. Not a channel: it places every
-  /// sample on the time axis the charts share.
   static const String timeKey = 't';
 
   static const Map<String, SensorMetadata> _known = {
@@ -33,9 +28,6 @@ class SensorMetadata {
 
   static final RegExp _trailingZeros = RegExp(r'\.?0+$');
 
-  /// [value] as the readout shows it: two decimals for measurements; for a
-  /// discrete channel only the decimals it has, so state 2.5 reads `2.5` and
-  /// state 3 reads `3`.
   String format(double value) {
     final text = value.toStringAsFixed(2);
     return discrete ? text.replaceFirst(_trailingZeros, '') : text;

@@ -22,7 +22,6 @@ class MyApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFFF8FAFC),
         useMaterial3: true,
       ),
-      // Localization configuration
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: const MainNavigation(),

@@ -14,8 +14,7 @@ class MqttConfig {
   static const String _password = String.fromEnvironment('MQTT_PASSWORD');
   static String _commandLogsTopic = 'prosthesis/actions';
   static String _validatedLogsTopic = 'prosthesis/logs/validated';
-  static String _powerFeedbackValidatedTopic =
-      'prosthesis/actions/feedback/validated';
+  static String _powerFeedbackValidatedTopic = 'prosthesis/actions/feedback/validated';
   static int _qos = 1;
   static String _clientId = 'prosthesis-mobile-controller';
   static Duration _connectionTimeout = const Duration(seconds: 15);
@@ -40,10 +39,7 @@ class MqttConfig {
   static Duration get powerFeedbackTimeout => _powerFeedbackTimeout;
 
   static Future<void> load({String? environment}) async {
-    final selectedEnvironment =
-        (environment ??
-                const String.fromEnvironment('APP_ENV', defaultValue: 'dev'))
-            .trim();
+    final selectedEnvironment = (environment ?? const String.fromEnvironment('APP_ENV', defaultValue: 'dev')).trim();
     final assetPath = 'assets/config/$selectedEnvironment.json';
 
     String jsonString;
@@ -59,25 +55,15 @@ class MqttConfig {
 
     final decoded = json.decode(jsonString);
     if (decoded is! Map<String, dynamic>) {
-      throw FormatException(
-        'MQTT config file "$assetPath" must contain a JSON object.',
-      );
+      throw FormatException('MQTT config file "$assetPath" must contain a JSON object.');
     }
 
     _environment = selectedEnvironment;
     _host = readString(decoded, 'host', fallback: _host);
     _port = readInt(decoded, 'port', fallback: _port);
     _useSSL = readBool(decoded, 'useSSL', fallback: _useSSL);
-    _commandLogsTopic = readString(
-      decoded,
-      'commandLogsTopic',
-      fallback: _commandLogsTopic,
-    );
-    _validatedLogsTopic = readString(
-      decoded,
-      'validatedLogsTopic',
-      fallback: _validatedLogsTopic,
-    );
+    _commandLogsTopic = readString(decoded, 'commandLogsTopic', fallback: _commandLogsTopic);
+    _validatedLogsTopic = readString(decoded, 'validatedLogsTopic', fallback: _validatedLogsTopic);
     _powerFeedbackValidatedTopic = readString(
       decoded,
       'powerFeedbackValidatedTopic',
@@ -86,30 +72,14 @@ class MqttConfig {
     _qos = readInt(decoded, 'qos', fallback: _qos);
     _clientId = readString(decoded, 'clientId', fallback: _clientId);
     _connectionTimeout = Duration(
-      seconds: readInt(
-        decoded,
-        'connectionTimeoutSeconds',
-        fallback: _connectionTimeout.inSeconds,
-      ),
+      seconds: readInt(decoded, 'connectionTimeoutSeconds', fallback: _connectionTimeout.inSeconds),
     );
     _reconnectInterval = Duration(
-      seconds: readInt(
-        decoded,
-        'reconnectIntervalSeconds',
-        fallback: _reconnectInterval.inSeconds,
-      ),
+      seconds: readInt(decoded, 'reconnectIntervalSeconds', fallback: _reconnectInterval.inSeconds),
     );
-    _maxReconnectAttempts = readInt(
-      decoded,
-      'maxReconnectAttempts',
-      fallback: _maxReconnectAttempts,
-    );
+    _maxReconnectAttempts = readInt(decoded, 'maxReconnectAttempts', fallback: _maxReconnectAttempts);
     _powerFeedbackTimeout = Duration(
-      seconds: readInt(
-        decoded,
-        'powerFeedbackTimeoutSeconds',
-        fallback: _powerFeedbackTimeout.inSeconds,
-      ),
+      seconds: readInt(decoded, 'powerFeedbackTimeoutSeconds', fallback: _powerFeedbackTimeout.inSeconds),
     );
   }
 }

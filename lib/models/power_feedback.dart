@@ -69,12 +69,9 @@ enum ProsthesisState {
   }
 }
 
-/// Who asked for what a feedback reports.
 enum FeedbackOrigin {
-  /// The answer to a command sent from the app.
   remote('remote'),
 
-  /// The prosthesis acted on its own, e.g. a stop requested on the Raspberry Pi.
   internal('internal');
 
   final String wireValue;
@@ -93,15 +90,12 @@ enum FeedbackOrigin {
 class PowerFeedback {
   final DateTime timestamp;
 
-  /// Id the server stored the command under; null for [FeedbackOrigin.internal].
   final int? commandId;
   final FeedbackOrigin origin;
   final PowerCommand command;
   final PowerFeedbackStatus status;
   final ProsthesisState state;
 
-  /// The gait mode and actuator current (mA) the prosthesis runs with. Only
-  /// reported while it is on: null when [state] is off.
   final int? gait;
   final int? current;
 
@@ -137,16 +131,11 @@ class PowerFeedback {
     }
 
     final rawTimestamp = decoded['timestamp'];
-    final timestamp = rawTimestamp is String
-        ? DateTime.tryParse(rawTimestamp)
-        : null;
+    final timestamp = rawTimestamp is String ? DateTime.tryParse(rawTimestamp) : null;
     final command = PowerCommand.fromWire(decoded['command']);
     final status = PowerFeedbackStatus.fromWire(decoded['status']);
     final state = ProsthesisState.fromWire(decoded['state']);
-    // Servers older than the origin field only ever relayed command answers.
-    final origin = decoded.containsKey('origin')
-        ? FeedbackOrigin.fromWire(decoded['origin'])
-        : FeedbackOrigin.remote;
+    final origin = decoded.containsKey('origin') ? FeedbackOrigin.fromWire(decoded['origin']) : FeedbackOrigin.remote;
     final commandId = decoded['command_id'];
     final gait = decoded['gait'];
     final current = decoded['current'];

@@ -15,20 +15,11 @@ class _MainNavigationState extends State<MainNavigation> {
 
   @override
   Widget build(BuildContext context) {
-    final screens = <Widget>[
-      const HomeScreen(),
-      SensorsScreen(isActive: _currentIndex == 1),
-    ];
+    final screens = <Widget>[const HomeScreen(), SensorsScreen(isActive: _currentIndex == 1)];
 
     const items = <BottomNavigationBarItem>[
-      BottomNavigationBarItem(
-        icon: Icon(Icons.directions_walk_rounded),
-        label: 'Control',
-      ),
-      BottomNavigationBarItem(
-        icon: Icon(Icons.show_chart_rounded),
-        label: 'Sensors',
-      ),
+      BottomNavigationBarItem(icon: Icon(Icons.directions_walk_rounded), label: 'Control'),
+      BottomNavigationBarItem(icon: Icon(Icons.show_chart_rounded), label: 'Sensors'),
     ];
 
     return Scaffold(

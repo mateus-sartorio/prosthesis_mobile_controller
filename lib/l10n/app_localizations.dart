@@ -11,8 +11,7 @@ import 'app_localizations_pt.dart';
 // ignore_for_file: type=lint
 
 abstract class AppLocalizations {
-  AppLocalizations(String locale)
-    : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+  AppLocalizations(String locale) : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -20,21 +19,16 @@ abstract class AppLocalizations {
     return Localizations.of<AppLocalizations>(context, AppLocalizations);
   }
 
-  static const LocalizationsDelegate<AppLocalizations> delegate =
-      _AppLocalizationsDelegate();
+  static const LocalizationsDelegate<AppLocalizations> delegate = _AppLocalizationsDelegate();
 
-  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
-      <LocalizationsDelegate<dynamic>>[
-        delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-      ];
-
-  static const List<Locale> supportedLocales = <Locale>[
-    Locale('en'),
-    Locale('pt'),
+  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates = <LocalizationsDelegate<dynamic>>[
+    delegate,
+    GlobalMaterialLocalizations.delegate,
+    GlobalCupertinoLocalizations.delegate,
+    GlobalWidgetsLocalizations.delegate,
   ];
+
+  static const List<Locale> supportedLocales = <Locale>[Locale('en'), Locale('pt')];
 
   String get instruction;
 
@@ -55,8 +49,7 @@ abstract class AppLocalizations {
   String get subir_escada;
 }
 
-class _AppLocalizationsDelegate
-    extends LocalizationsDelegate<AppLocalizations> {
+class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
   const _AppLocalizationsDelegate();
 
   @override
@@ -65,8 +58,7 @@ class _AppLocalizationsDelegate
   }
 
   @override
-  bool isSupported(Locale locale) =>
-      <String>['en', 'pt'].contains(locale.languageCode);
+  bool isSupported(Locale locale) => <String>['en', 'pt'].contains(locale.languageCode);
 
   @override
   bool shouldReload(_AppLocalizationsDelegate old) => false;
@@ -80,7 +72,5 @@ AppLocalizations lookupAppLocalizations(Locale locale) {
       return AppLocalizationsPt();
   }
 
-  throw FlutterError(
-    'AppLocalizations.delegate failed to load unsupported locale "$locale".',
-  );
+  throw FlutterError('AppLocalizations.delegate failed to load unsupported locale "$locale".');
 }

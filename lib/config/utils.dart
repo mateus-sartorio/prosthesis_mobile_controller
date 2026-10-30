@@ -1,8 +1,4 @@
-String readString(
-  Map<String, dynamic> data,
-  String key, {
-  required String fallback,
-}) {
+String readString(Map<String, dynamic> data, String key, {required String fallback}) {
   final value = data[key];
   if (value is String && value.isNotEmpty) {
     return value;
