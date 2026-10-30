@@ -5,14 +5,13 @@ import 'package:flutter/services.dart';
 
 import 'utils.dart';
 
-/// MQTT configuration loaded from an environment-specific JSON file.
 class MqttConfig {
   static String _environment = 'dev';
   static String _host = '10.0.2.2';
   static int _port = 1883;
   static bool _useSSL = false;
-  static String? _username;
-  static String? _password;
+  static const String _username = String.fromEnvironment('MQTT_USERNAME');
+  static const String _password = String.fromEnvironment('MQTT_PASSWORD');
   static String _commandLogsTopic = 'prosthesis/actions';
   static String _validatedLogsTopic = 'prosthesis/logs/validated';
   static String _powerFeedbackValidatedTopic =
@@ -28,8 +27,8 @@ class MqttConfig {
   static String get host => _host;
   static int get port => _port;
   static bool get useSSL => _useSSL;
-  static String? get username => _username;
-  static String? get password => _password;
+  static String? get username => _username.isEmpty ? null : _username;
+  static String? get password => _password.isEmpty ? null : _password;
   static String get commandLogsTopic => _commandLogsTopic;
   static String get validatedLogsTopic => _validatedLogsTopic;
   static String get powerFeedbackValidatedTopic => _powerFeedbackValidatedTopic;
@@ -69,8 +68,6 @@ class MqttConfig {
     _host = readString(decoded, 'host', fallback: _host);
     _port = readInt(decoded, 'port', fallback: _port);
     _useSSL = readBool(decoded, 'useSSL', fallback: _useSSL);
-    _username = readNullableString(decoded, 'username');
-    _password = readNullableString(decoded, 'password');
     _commandLogsTopic = readString(
       decoded,
       'commandLogsTopic',

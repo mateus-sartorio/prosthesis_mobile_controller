@@ -9,15 +9,8 @@
             "request": "launch",
             "type": "dart",
             "toolArgs": [
-                "--dart-define=APP_ENV=dev"
-            ]
-        },
-        {
-            "name": "prosthesis_mobile_controller (prod)",
-            "request": "launch",
-            "type": "dart",
-            "toolArgs": [
-                "--dart-define=APP_ENV=prod"
+                "--dart-define=APP_ENV=dev",
+                "--dart-define-from-file=secrets.json"
             ]
         },
         {
@@ -26,16 +19,8 @@
             "type": "dart",
             "flutterMode": "profile",
             "toolArgs": [
-                "--dart-define=APP_ENV=dev"
-            ]
-        },
-        {
-            "name": "prosthesis_mobile_controller (prod profile mode)",
-            "request": "launch",
-            "type": "dart",
-            "flutterMode": "profile",
-            "toolArgs": [
-                "--dart-define=APP_ENV=prod"
+                "--dart-define=APP_ENV=dev",
+                "--dart-define-from-file=secrets.json"
             ]
         },
         {
@@ -44,16 +29,8 @@
             "type": "dart",
             "flutterMode": "release",
             "toolArgs": [
-                "--dart-define=APP_ENV=dev"
-            ]
-        },
-        {
-            "name": "prosthesis_mobile_controller (prod release mode)",
-            "request": "launch",
-            "type": "dart",
-            "flutterMode": "release",
-            "toolArgs": [
-                "--dart-define=APP_ENV=prod"
+                "--dart-define=APP_ENV=dev",
+                "--dart-define-from-file=secrets.json"
             ]
         }
     ]
